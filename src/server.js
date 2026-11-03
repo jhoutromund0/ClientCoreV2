@@ -1,13 +1,3 @@
-const express = require('express');
-const path = require('path');
-
-const app = express();
-
-    app.set('views', path.join(__dirname, 'views'));
-    app.set('view engine', 'ejs');
-    app.get("/", (req, res) => {
-        res.render('system');
-    });
-    app.listen(3000, () => {
-        console.log('Servidor rodando na porta 3000');
-    });
+const app = require('./app');
+const port = Number(process.env.PORT || 3000);
+app.listen(port, () => console.log(`Client Core disponível em http://localhost:${port}`));

@@ -1,0 +1,25 @@
+require('dotenv').config();
+const express = require('express');
+const path = require('path');
+const helmet = require('helmet');
+const expressLayouts = require('express-ejs-layouts');
+const pageRoutes = require('./routes/pageRoutes');
+const clientRoutes = require('./routes/clientRoutes');
+const pageController = require('./controllers/pageController');
+
+const app = express();
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
+app.set('layout', 'layouts/main');
+app.use(expressLayouts);
+app.locals.flash = null;
+app.use(helmet({ contentSecurityPolicy: { directives: { ...helmet.contentSecurityPolicy.getDefaultDirectives(), 'script-src': ["'self'", "'unsafe-inline'", 'https://cdn.tailwindcss.com'], 'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'], 'font-src': ["'self'", 'https://fonts.gstatic.com', 'data:'] } } }));
+app.use(express.urlencoded({ extended: false, limit: '50kb' }));
+app.use(express.json({ limit: '50kb' }));
+app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use((req, res, next) => { res.locals.currentPath = req.path; res.locals.flash = app.locals.flash; app.locals.flash = null; next(); });
+app.use('/', pageRoutes);
+app.use('/clientes', clientRoutes);
+app.use((req, res) => pageController.notFound(req, res));
+app.use((err, req, res, next) => { console.error(err); res.status(500).render('pages/error', { title: 'Erro interno', code: 500, message: process.env.NODE_ENV === 'development' ? err.message : 'Ocorreu um erro inesperado.' }); });
+module.exports = app;
