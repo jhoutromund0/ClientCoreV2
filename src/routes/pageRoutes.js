@@ -5,4 +5,6 @@ router.get('/sobre', pages.about);
 router.get('/login', pages.login);
 router.get('/cadastro', pages.register);
 router.get('/painel', pages.dashboard);
+router.post('/login', pages.authNotReady('/login'));
+router.post('/cadastro', pages.authNotReady('/cadastro'));
 module.exports = router;
