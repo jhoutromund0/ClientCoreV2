@@ -1,0 +1,11 @@
+const router = require('express').Router();
+const { body } = require('express-validator');
+const clients = require('../controllers/clientController');
+const validateClient = [body('name').trim().notEmpty().withMessage('Informe o nome do cliente.').isLength({ max: 120 }).withMessage('O nome deve ter até 120 caracteres.'), body('email').optional({ checkFalsy: true }).isEmail().withMessage('Informe um e-mail válido.')];
+router.get('/', clients.index);
+router.get('/novo', clients.createForm);
+router.post('/', validateClient, clients.create);
+router.get('/:id/editar', clients.editForm);
+router.post('/:id', validateClient, clients.update);
+router.post('/:id/excluir', clients.remove);
+module.exports = router;

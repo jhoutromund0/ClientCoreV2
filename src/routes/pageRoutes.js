@@ -1,0 +1,8 @@
+const router = require('express').Router();
+const pages = require('../controllers/pageController');
+router.get('/', pages.home);
+router.get('/sobre', pages.about);
+router.get('/login', pages.login);
+router.get('/cadastro', pages.register);
+router.get('/painel', pages.dashboard);
+module.exports = router;
