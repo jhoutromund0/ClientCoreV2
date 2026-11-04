@@ -1,0 +1,31 @@
+<main class="shell inner-page" id="main-content">
+  <span class="eyebrow">GESTÃO DE ATENDIMENTOS</span>
+  <h1>Financeiro</h1>
+  <p class="lead">Acompanhe orçamentos, cobranças e custos de materiais por atendimento.</p>
+
+  <% if (!entries.length) { %>
+    <p>Agende um atendimento no calendário para iniciar um lançamento.</p>
+    <a class="button" href="/calendario">Abrir calendário</a>
+  <% } else { %>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Cliente</th><th>Atendimento</th><th>Situação</th><th>Materiais (custo)</th><th>Valor previsto ou a cobrar</th><th>Recebido</th><th>Ação</th></tr>
+        </thead>
+        <tbody>
+          <% entries.forEach(({ visit, record }) => { %>
+            <tr>
+              <td><%= visit.clientName %></td>
+              <td><%= visit.description %> · <%= visit.scheduledAt.slice(0, 10).split('-').reverse().join('/') %></td>
+              <td><%= record ? (statuses[record.status] || 'Serviço') : 'Sem lançamento' %></td>
+              <td><%= record ? formatMoney(record.cost) : '—' %></td>
+              <td><%= record ? formatMoney(record.charge) : '—' %></td>
+              <td><%= record ? formatMoney(record.received) : '—' %></td>
+              <td><a class="text-button" href="/financeiro/atendimentos/<%= visit.id %>"><%= record ? 'Editar' : 'Lançar valores' %></a></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</main>

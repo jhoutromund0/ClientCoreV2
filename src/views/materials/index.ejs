@@ -1,0 +1,98 @@
+<main id="main-content" class="shell inner-page">
+  <div class="page-title-row">
+    <div>
+      <span class="eyebrow">ESTOQUE</span>
+      <h1>Materiais</h1>
+      <p class="muted">Controle os materiais por quantidade, metro ou kg, com o valor calculado pelo tipo de uso.</p>
+    </div>
+    <a class="button" href="/materiais" id="novo-material">+ Novo material</a>
+  </div>
+
+  <div class="stats-grid" id="material-stats">
+    <div class="stat-card"><span>Itens cadastrados</span><strong id="total-itens"><%= materials.length %></strong><small>Itens visíveis na lista</small></div>
+    <div class="stat-card"><span>Medida total</span><strong class="stat-text" id="total-medida">0</strong><small>Soma das quantidades e medidas</small></div>
+    <div class="stat-card"><span>Valor em estoque</span><strong class="stat-text" id="valor-total">R$ 0,00</strong><small>Medida × valor unitário</small></div>
+  </div>
+
+  <div class="split-layout">
+    <form id="material-form" class="panel-form" method="post" action="<%= materialData && materialData.id ? '/materiais/' + materialData.id : '/materiais' %>" autocomplete="off">
+      <h2 id="form-title"><%= materialData && materialData.id ? 'Editar material' : 'Adicionar material' %></h2>
+      <% if (errors && errors.length) { %>
+        <div class="validation-errors" role="alert"><strong>Revise os campos:</strong><ul><% errors.forEach(error => { %><li><%= error.msg %></li><% }) %></ul></div>
+      <% } else { %>
+        <p id="form-status" class="muted form-hint"><%= materialData && materialData.id ? 'Atualize os dados e salve.' : 'Pronto para cadastrar um novo material.' %></p>
+      <% } %>
+
+      <div class="form-grid one-col">
+        <label>Nome
+          <input id="material-nome" name="name" value="<%= materialData ? materialData.name : '' %>" maxlength="120" placeholder="Ex: Cabo CAT6" required>
+        </label>
+        <label>Controle por
+          <select id="material-tipo-medida" name="measureType">
+            <option value="quantidade" <%= !materialData || materialData.measureType !== 'comprimento' ? 'selected' : '' %>>Quantidade</option>
+            <option value="comprimento" <%= materialData && materialData.measureType === 'comprimento' ? 'selected' : '' %>>Comprimento</option>
+          </select>
+        </label>
+        <label>
+          <span id="medida-label"><%= materialData && materialData.measureType === 'comprimento' ? 'Comprimento' : 'Quantidade' %></span>
+          <input id="material-medida" name="measure" type="number" min="0.01" step="0.01" value="<%= materialData && materialData.measure !== '' && materialData.measure != null ? materialData.measure : '' %>" placeholder="0" required>
+        </label>
+        <label id="unidade-medida-wrapper" <%= materialData && materialData.measureType === 'comprimento' ? '' : 'hidden' %>>Unidade
+          <select id="material-unidade-medida" name="unit">
+            <option value="m" <%= !materialData || materialData.unit !== 'kg' ? 'selected' : '' %>>Metro</option>
+            <option value="kg" <%= materialData && materialData.unit === 'kg' ? 'selected' : '' %>>Kg</option>
+          </select>
+        </label>
+        <label>Valor unitário
+          <input id="material-valor" name="unitValue" type="number" min="0" step="0.01" value="<%= materialData && materialData.unitValue !== '' && materialData.unitValue != null ? materialData.unitValue : '' %>" placeholder="0,00" required>
+        </label>
+      </div>
+      <div class="form-actions">
+        <% if (materialData && materialData.id) { %><a class="button button-ghost" id="cancelar-edicao" href="/materiais">Cancelar</a><% } %>
+        <button class="button" id="submit-material" type="submit"><%= materialData && materialData.id ? 'Atualizar material' : 'Salvar material' %> →</button>
+      </div>
+    </form>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Lista de materiais</h2>
+          <p class="muted">Nome, medida, valor e total de cada item.</p>
+        </div>
+        <label class="search-field">Buscar material
+          <input id="buscar-material" type="search" placeholder="Nome ou tipo">
+        </label>
+      </div>
+      <div class="table-wrap">
+        <table <%= materials.length ? '' : 'hidden' %>>
+          <caption class="sr-only">Materiais cadastrados, valores e ações disponíveis</caption>
+          <thead>
+            <tr><th>Nome</th><th>Tipo</th><th>Medida</th><th>Valor</th><th>Total</th><th>Ações</th></tr>
+          </thead>
+          <tbody id="materiais-lista">
+            <% materials.forEach(item => { %>
+              <tr data-name="<%= item.name %>" data-type="<%= item.measureType %>" data-measure="<%= item.measure %>" data-value="<%= item.unitValue %>">
+                <td><strong><%= item.name %></strong></td>
+                <td><%= item.measureType === 'comprimento' ? 'Comprimento' : 'Quantidade' %></td>
+                <td class="measure-cell"><%= Number(item.measure).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %> <%= item.measureType === 'comprimento' ? item.unit : 'un' %></td>
+                <td><%= Number(item.unitValue).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) %></td>
+                <td><%= (Number(item.measure) * Number(item.unitValue)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) %></td>
+                <td class="actions">
+                  <a href="/materiais/<%= item.id %>/editar">Editar</a>
+                  <form action="/materiais/<%= item.id %>/excluir" method="post" data-confirm="Excluir este material?"><button class="text-button danger" type="submit">Excluir</button></form>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+        <div id="lista-vazia" class="empty-state compact" <%= materials.length ? 'hidden' : '' %>>
+          <span class="empty-icon">▤</span>
+          <h2>Nenhum material encontrado</h2>
+          <p>Cadastre um novo item para iniciar o controle.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+  <p class="storage-note">ⓘ Nesta etapa, os dados ficam em memória e não são persistidos após reiniciar o servidor.</p>
+</main>
+<script src="/js/materials.js" defer></script>

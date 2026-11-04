@@ -4,3 +4,52 @@
 
 .input-action{display:flex;gap:10px;align-items:stretch}.input-action input{flex:1;min-width:0}.input-action .button{white-space:nowrap}
 .lookup-status{min-height:20px;margin:12px 0 0;font-size:13px;color:var(--muted)}.lookup-status[data-kind=ok]{color:var(--green)}.lookup-status[data-kind=error]{color:#f0a3a3}
+[hidden]{display:none !important}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.stat-card small a{color:var(--accent);font-weight:700}
+.split-layout{display:grid;grid-template-columns:340px 1fr;gap:16px;align-items:start;margin-top:22px}
+.stack{display:grid;gap:12px}
+.panel,.filter-panel{padding:22px;border:1px solid #ffffff13;border-radius:18px;background:#171b17}
+.panel h2,.filter-panel h2{margin:0 0 6px;font-size:20px;letter-spacing:-.4px}
+.panel-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:16px}
+.panel-head p,.form-hint{margin:0;font-size:12px}
+.panel-form{padding:22px;border:1px solid #ffffff13;border-radius:18px;background:#171b17}
+.panel-form.plain{padding:0;border:0;background:transparent}
+.panel-form h2{margin:0 0 8px;font-size:22px}
+.panel-form label,.filter-panel label,.search-field{display:grid;gap:8px;color:#dce0d8;font-size:12px;font-weight:650}
+.panel-form input,.panel-form select,.panel-form textarea,.filter-panel input,.search-field input{width:100%;padding:13px 14px;border:1px solid #394137;border-radius:10px;background:#101410;color:#fff;outline:none}
+.panel-form textarea{min-height:110px;resize:vertical}
+.panel-form input:focus,.panel-form select:focus,.panel-form textarea:focus,.filter-panel input:focus,.search-field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px #c5bdb11c}
+.form-grid.one-col{grid-template-columns:1fr}
+.search-field{min-width:220px}
+.month-nav{display:flex;align-items:center;gap:8px}
+.month-nav p{margin:0;min-width:150px;text-align:center;font-weight:700;text-transform:capitalize}
+.month-nav button,.agendar-dia{border:1px solid #3a4138;background:#101410;color:#e5e7e1;border-radius:10px;cursor:pointer}
+.month-nav button{width:36px;height:36px;font-size:18px}
+.weekday-row,.calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
+.weekday-row{margin-bottom:8px;color:#9ba399;font-size:10px;letter-spacing:1px;text-transform:uppercase;text-align:center}
+.day-cell{position:relative;min-height:112px;padding:10px;border:1px solid #ffffff10;border-radius:16px;background:#101410}
+.day-cell.blank{background:transparent;border-color:transparent}
+.day-cell.today{border-color:#83e29a;background:#1b271c;box-shadow:0 0 0 1px #83e29a40}
+.day-cell.dim{opacity:.35}
+.day-top{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:700}
+.agendar-dia{width:26px;height:26px;border-radius:50%}
+.agendar-dia:hover,.month-nav button:hover{background:#ffffff10}
+.day-visits{display:grid;gap:6px;margin-top:8px}
+.visit-count{justify-self:start;padding:2px 7px;border-radius:99px;background:#83e29a18;color:var(--green);font-size:10px;font-weight:700}
+.day-chip{padding:6px 8px;border-radius:10px;background:#ffffff08;font-size:10px;color:#c5ccc4}
+.day-chip strong,.day-chip span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.day-chip strong{color:#fff}
+.no-visit{position:absolute;inset:28px 8px 8px;display:grid;place-items:center;color:#7d887c;font-size:9px;letter-spacing:1px;text-transform:uppercase}
+.visits-panel{margin-top:16px}
+.visit-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.visit-card{padding:16px;border:1px solid #ffffff10;border-radius:16px;background:#101410}
+.visit-date{margin:0;color:var(--green);font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase}
+.visit-card h3{margin:6px 0;font-size:16px}
+.visit-card p{margin:8px 0 0;color:#c5ccc4;font-size:12px}
+.visit-card strong,.visit-card p span{display:block}
+.visit-card strong{color:#fff;font-size:12px}
+.modal{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;padding:24px;background:#00000099;backdrop-filter:blur(6px)}
+.modal-card{width:min(100%,640px);max-height:calc(100vh - 48px);overflow:auto;padding:22px;border:1px solid #ffffff18;border-radius:20px;background:#171b17;box-shadow:0 30px 80px #000a}
+.empty-state.compact{padding:28px 16px;border:0;background:transparent}
+@media(max-width:980px){.split-layout,.visit-grid{grid-template-columns:1fr}.calendar-layout{grid-template-columns:1fr}.day-cell{min-height:88px;padding:8px}.day-chip{display:none}}

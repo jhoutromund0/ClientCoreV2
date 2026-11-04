@@ -1,0 +1,40 @@
+<fieldset data-material-row>
+  <legend>Material</legend>
+  <div class="form-grid">
+    <label>Preencher pelo catálogo
+      <select data-catalog>
+        <option value="">Selecione um material</option>
+        <% materials.forEach((material) => { %>
+          <option value="<%= material.id %>" data-name="<%= material.name %>" data-unit="<%= material.unit %>" data-cost="<%= material.unitValue.toFixed(2) %>"><%= material.name %></option>
+        <% }) %>
+      </select>
+    </label>
+    <label>Nome do material
+      <input name="name" maxlength="120" value="<%= item.name %>" required>
+    </label>
+    <label>Origem
+      <select name="origin">
+        <% Object.entries(origins).forEach(([key, label]) => { %>
+          <option value="<%= key %>" <%= item.origin === key ? 'selected' : '' %>><%= label %></option>
+        <% }) %>
+      </select>
+    </label>
+    <label>Unidade
+      <select name="unit">
+        <% units.forEach((unit) => { %>
+          <option value="<%= unit %>" <%= item.unit === unit ? 'selected' : '' %>><%= unit %></option>
+        <% }) %>
+      </select>
+    </label>
+    <label>Quantidade
+      <input name="quantity" inputmode="decimal" maxlength="10" value="<%= item.quantity %>" required>
+    </label>
+    <label>Custo unitário (R$)
+      <input name="cost" inputmode="decimal" maxlength="11" value="<%= item.cost %>" required>
+    </label>
+    <label>Preço unitário cobrado (R$)
+      <input name="price" inputmode="decimal" maxlength="11" value="<%= item.price %>" required>
+    </label>
+  </div>
+  <button type="button" class="text-button danger" data-remove-material>Remover material</button>
+</fieldset>

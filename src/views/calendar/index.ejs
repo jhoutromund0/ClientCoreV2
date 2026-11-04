@@ -1,0 +1,99 @@
+<main id="main-content" class="shell inner-page">
+  <div class="page-title-row">
+    <div>
+      <span class="eyebrow">AGENDA</span>
+      <h1>Calendário de visitas</h1>
+      <p class="muted">Veja o mês atual e agende visitas técnicas para os clientes. Clique no + de um dia para marcar o serviço.</p>
+    </div>
+    <button class="button" id="hoje-button" type="button">Ir para hoje</button>
+  </div>
+
+  <div class="split-layout calendar-layout">
+    <aside class="stack">
+      <div class="stat-card"><span>Visitas agendadas</span><strong id="total-visitas">0</strong><small>Considerando o filtro atual</small></div>
+      <div class="stat-card"><span>Visitas este mês</span><strong id="total-visitas-mes">0</strong><small id="mes-resumo">No mês exibido</small></div>
+      <div class="panel filter-panel">
+        <h2>Filtrar por cliente</h2>
+        <label>Nome do cliente
+          <input id="buscar-cliente" list="clientes-list" type="search" placeholder="Digite o nome do cliente" autocomplete="off">
+        </label>
+        <datalist id="clientes-list">
+          <% clients.forEach(client => { %><option value="<%= client.label %>"></option><% }) %>
+        </datalist>
+        <button class="button button-ghost full" id="limpar-filtro" type="button">Limpar filtro</button>
+      </div>
+    </aside>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Calendário</h2>
+          <p id="calendario-status" class="muted">Clique no + para agendar uma visita em qualquer dia.</p>
+        </div>
+        <div class="month-nav">
+          <button id="prev-month" type="button" aria-label="Mês anterior">‹</button>
+          <p id="mes-ano"></p>
+          <button id="next-month" type="button" aria-label="Próximo mês">›</button>
+        </div>
+      </div>
+      <div class="weekday-row" aria-hidden="true"><span>Dom</span><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span></div>
+      <div id="calendario-grid" class="calendar-grid"></div>
+    </section>
+  </div>
+
+  <section class="panel visits-panel">
+    <div class="panel-head">
+      <div>
+        <h2>Todas as visitas agendadas</h2>
+        <p class="muted">Serviço, materiais e técnicos de cada atendimento.</p>
+      </div>
+    </div>
+    <div id="visitas-do-dia" class="visit-grid"></div>
+  </section>
+
+  <p class="storage-note">ⓘ Nesta etapa, os dados ficam em memória e não são persistidos após reiniciar o servidor.</p>
+</main>
+
+<div id="modal-agendar" class="modal" <%= visitDraft ? '' : 'hidden' %>>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="panel-head">
+      <div>
+        <h2 id="modal-title"><%= visitDraft && visitDraft.id ? 'Editar visita' : 'Agendar visita' %></h2>
+        <p id="modal-data" class="muted"><%= visitDraft && visitDraft.id ? 'Atualize os dados da visita.' : 'Escolha o cliente e o serviço do dia.' %></p>
+      </div>
+      <button id="fechar-modal" class="button button-ghost" type="button">Fechar</button>
+    </div>
+    <% if (errors && errors.length) { %>
+      <div class="validation-errors" role="alert"><strong>Revise os campos:</strong><ul><% errors.forEach(error => { %><li><%= error.msg %></li><% }) %></ul></div>
+    <% } %>
+    <form id="form-visita" class="panel-form plain" method="post" action="<%= visitDraft && visitDraft.id ? '/calendario/' + visitDraft.id : '/calendario' %>">
+      <div class="form-grid one-col">
+        <label>Data
+          <input id="visita-data" name="scheduledAt" type="date" value="<%= visitDraft ? (visitDraft.scheduledAt || '').slice(0, 10) : '' %>" required>
+        </label>
+        <label>Cliente
+          <input id="visita-cliente" name="clientName" list="clientes-list" value="<%= visitDraft ? visitDraft.clientName || '' : '' %>" placeholder="Digite o cliente" maxlength="160" required>
+        </label>
+        <label>O que será realizado
+          <select id="visita-tipo" name="description" required>
+            <option value="">Selecione o serviço</option>
+            <% services.forEach(service => { %>
+              <option value="<%= service %>" <%= visitDraft && visitDraft.description === service ? 'selected' : '' %>><%= service %></option>
+            <% }) %>
+          </select>
+        </label>
+        <label>Materiais necessários
+          <textarea id="visita-materiais" name="materials" maxlength="2000" placeholder="Cabos, conectores, equipamentos..."><%= visitDraft ? visitDraft.materials || '' : '' %></textarea>
+        </label>
+        <label>Técnico(s)
+          <input id="visita-tecnicos" name="technicians" value="<%= visitDraft ? visitDraft.technicians || '' : '' %>" maxlength="240" placeholder="Nome do(s) técnico(s)">
+        </label>
+      </div>
+      <div class="form-actions">
+        <button class="button" type="submit"><%= visitDraft && visitDraft.id ? 'Salvar alterações' : 'Salvar visita' %> →</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script id="calendar-data" type="application/json"><%- calendarJson %></script>
+<script src="/js/calendar.js" defer></script>

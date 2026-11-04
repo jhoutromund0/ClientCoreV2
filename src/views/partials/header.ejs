@@ -2,7 +2,7 @@
   <a class="brand" href="/" aria-label="Client Core - início"><span class="brand-mark">C</span><span>client<span class="brand-light">core</span></span></a>
   <button class="menu-toggle" type="button" aria-label="Abrir menu" aria-expanded="false">☰</button>
   <nav class="main-nav" aria-label="Navegação principal">
-    <a class="<%= currentPath === '/' ? 'active' : '' %>" href="/">Início</a><a class="<%= currentPath === '/sobre' ? 'active' : '' %>" href="/sobre">Sobre</a><a class="<%= currentPath.startsWith('/clientes') ? 'active' : '' %>" href="/clientes">Clientes</a><a class="<%= currentPath === '/painel' ? 'active' : '' %>" href="/painel">Painel</a>
+    <a class="<%= currentPath === '/' ? 'active' : '' %>" href="/">Início</a><a class="<%= currentPath === '/sobre' ? 'active' : '' %>" href="/sobre">Sobre</a><a class="<%= currentPath.startsWith('/clientes') ? 'active' : '' %>" href="/clientes">Clientes</a><a class="<%= currentPath.startsWith('/materiais') ? 'active' : '' %>" href="/materiais">Materiais</a><a class="<%= currentPath.startsWith('/calendario') ? 'active' : '' %>" href="/calendario">Calendário</a><a class="<%= currentPath.startsWith('/financeiro') ? 'active' : '' %>" href="/financeiro">Financeiro</a><a class="<%= currentPath === '/painel' ? 'active' : '' %>" href="/painel">Painel</a>
   </nav>
   <div class="header-actions"><a class="login-link" href="/login">Entrar</a><a class="button button-small" href="/cadastro">Começar grátis <span aria-hidden="true">↗</span></a></div>
 </header>

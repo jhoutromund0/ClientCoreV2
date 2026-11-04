@@ -1,0 +1,48 @@
+<main class="shell inner-page" id="main-content">
+  <a class="text-button" href="/financeiro">Voltar ao financeiro</a>
+  <h1>Financeiro do atendimento</h1>
+  <p class="lead"><%= visit.clientName %> · <%= visit.description %> · <%= visit.scheduledAt.slice(0, 10).split('-').reverse().join('/') %></p>
+  <% if (errors.length) { %>
+    <div class="validation-errors" role="alert">
+      <ul><% errors.forEach((error) => { %><li><%= error %></li><% }) %></ul>
+    </div>
+  <% } %>
+  <form id="finance-form" method="post" action="/financeiro/atendimentos/<%= visit.id %>">
+    <div class="form-grid">
+      <% if (visit.description === 'Orçamento') { %>
+        <label>Situação do orçamento
+          <select name="status">
+            <% Object.entries(statuses).forEach(([key, label]) => { %>
+              <option value="<%= key %>" <%= draft.status === key ? 'selected' : '' %>><%= label %></option>
+            <% }) %>
+          </select>
+        </label>
+      <% } %>
+      <label>Valor do serviço (R$)
+        <input name="labor" inputmode="decimal" maxlength="11" value="<%= draft.labor %>" required>
+      </label>
+      <label>Valor recebido (R$)
+        <input name="received" inputmode="decimal" maxlength="11" value="<%= draft.received %>" required>
+      </label>
+    </div>
+    <h2>Materiais do atendimento</h2>
+    <p class="muted">Informe o custo e quanto será cobrado do cliente por unidade. A quantidade lançada serve para o cálculo financeiro.</p>
+    <div id="finance-items">
+      <% draft.items.forEach((item) => { %>
+        <%- include('item', { item }) %>
+      <% }) %>
+    </div>
+    <button id="finance-add" type="button" class="button button-ghost">Adicionar material</button>
+    <p class="muted" id="finance-preview" aria-live="polite"></p>
+    <button type="submit" class="button">Salvar lançamento</button>
+  </form>
+  <% if (hasRecord) { %>
+    <form method="post" action="/financeiro/atendimentos/<%= visit.id %>/excluir" data-confirm="Excluir o lançamento financeiro deste atendimento?">
+      <button type="submit" class="text-button danger">Excluir lançamento</button>
+    </form>
+  <% } %>
+  <template id="finance-item-template">
+    <%- include('item', { item: { name: '', origin: 'estoque', unit: 'un', quantity: '1', cost: '0.00', price: '0.00' } }) %>
+  </template>
+</main>
+<script src="/js/finance.js" defer></script>

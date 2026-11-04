@@ -5,6 +5,9 @@ const helmet = require('helmet');
 const expressLayouts = require('express-ejs-layouts');
 const pageRoutes = require('./routes/pageRoutes');
 const clientRoutes = require('./routes/clientRoutes');
+const materialRoutes = require('./routes/materialRoutes');
+const visitRoutes = require('./routes/visitRoutes');
+const financeRoutes = require('./routes/financeRoutes');
 const pageController = require('./controllers/pageController');
 
 const app = express();
@@ -26,6 +29,9 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use((req, res, next) => { res.locals.flash = app.locals.flash; app.locals.flash = null; next(); });
 app.use('/', pageRoutes);
 app.use('/clientes', clientRoutes);
+app.use('/materiais', materialRoutes);
+app.use('/calendario', visitRoutes);
+app.use('/financeiro', financeRoutes);
 app.use((req, res) => pageController.notFound(req, res));
 app.use((err, req, res, next) => {
   if (res.headersSent) return next(err);
