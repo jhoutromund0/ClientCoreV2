@@ -40,29 +40,55 @@ function requireRole(role) { return (req, res, next) => { if (!req.user)
     return res.redirect('/login'); if (req.user.role !== role)
     return res.status(403).render('pages/error', { title: 'Acesso negado', code: 403, message: 'Seu perfil não tem permissão para acessar esta área.' }); next(); }; }
 
+
 function csrf(req, res, next) {
     if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
         return next();
     }
 
     const origin = req.get('origin');
-    if (origin) {
+    const expectedHost = req.get('host');
+    const fetchSite = req.get('sec-fetch-site');
+
+    let appHost;
+
+    try {
+        appHost = process.env.APP_URL
+            ? new URL(process.env.APP_URL).host
+            : null;
+    } catch {
+        return res.status(403).send('Configuração de origem inválida');
+    }
+
+    if (origin && origin !== 'null') {
         try {
             const originUrl = new URL(origin);
-            const expectedHost = req.get('host');
 
             const allowedHosts = [
                 expectedHost,
-                process.env.APP_URL ? new URL(process.env.APP_URL).host : null
+                appHost
             ].filter(Boolean);
 
-            if (!['https:', 'http:'].includes(originUrl.protocol) ||
-                !allowedHosts.includes(originUrl.host)) {
+            if (
+                !['https:', 'http:'].includes(originUrl.protocol) ||
+                !allowedHosts.includes(originUrl.host)
+            ) {
                 return res.status(403).send('Origem inválida');
             }
         } catch {
             return res.status(403).send('Origem inválida');
         }
+    } else if (
+        origin === 'null' &&
+        (
+            fetchSite !== 'same-origin' ||
+            !appHost ||
+            expectedHost !== appHost
+        )
+    ) {
+        return res.status(403).send('Origem inválida');
+    } else if (!origin && fetchSite !== 'same-origin') {
+        return res.status(403).send('Origem inválida');
     }
 
     if (!req.user) {
@@ -75,7 +101,10 @@ function csrf(req, res, next) {
         typeof value !== 'string' ||
         !req.csrfToken ||
         value.length !== req.csrfToken.length ||
-        !crypto.timingSafeEqual(Buffer.from(value), Buffer.from(req.csrfToken))
+        !crypto.timingSafeEqual(
+            Buffer.from(value),
+            Buffer.from(req.csrfToken)
+        )
     ) {
         return res.status(403).send('Token de segurança inválido');
     }
