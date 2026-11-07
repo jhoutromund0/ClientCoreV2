@@ -1,58 +1,56 @@
-document.addEventListener('DOMContentLoaded', () => {
-    const form = document.getElementById('material-form');
-    if (!form)
-        return;
-    const selectTipo = document.getElementById('material-tipo-medida');
-    const wrapperUnidade = document.getElementById('unidade-medida-wrapper');
-    const medidaLabel = document.getElementById('medida-label');
-    const busca = document.getElementById('buscar-material');
-    const lista = document.getElementById('materiais-lista');
-    const listaVazia = document.getElementById('lista-vazia');
-    const totalItens = document.getElementById('total-itens');
-    const totalMedida = document.getElementById('total-medida');
-    const valorTotal = document.getElementById('valor-total');
-    const moeda = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
-    const numero = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    function atualizarTipo() {
-        const comprimento = selectTipo.value === 'comprimento';
-        wrapperUnidade.hidden = !comprimento;
-        medidaLabel.textContent = comprimento ? 'Comprimento' : 'Quantidade';
-    }
-    function atualizarLista() {
-        const termo = (busca.value || '').trim().toLocaleLowerCase('pt-BR');
-        const linhas = [...lista.querySelectorAll('tr')];
-        let itens = 0;
-        let medida = 0;
-        let valor = 0;
-        linhas.forEach((linha) => {
-            const nome = (linha.dataset.name || '').toLocaleLowerCase('pt-BR');
-            const tipo = linha.dataset.type === 'comprimento' ? 'comprimento' : 'quantidade';
-            const visivel = !termo || nome.includes(termo) || tipo.includes(termo);
-            linha.hidden = !visivel;
-            if (!visivel)
-                return;
-            itens += 1;
-            medida += Number(linha.dataset.measure || 0);
-            valor += Number(linha.dataset.measure || 0) * Number(linha.dataset.value || 0);
+
+const path = require('path');
+
+require('dotenv').config({
+    path: path.join(__dirname, '..', '.env')
+});
+
+const User = require('../src/models/User');
+const { pool } = require('../src/config/database');
+const readline = require('readline/promises');
+
+async function main() {
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+    });
+
+    try {
+        console.log('\n=== CRIAR ADMINISTRADOR ===\n');
+
+        const name = (await rl.question('Nome: ')).trim();
+        const email = (await rl.question('E-mail: ')).trim().toLowerCase();
+        const password = await rl.question('Senha (mínimo 12 caracteres): ');
+
+        if (name.length < 2 || !/^\S+@\S+\.\S+$/.test(email) || password.length < 12) {
+            throw new Error('Dados inválidos. Confira nome, e-mail e senha.');
+        }
+
+        const existing = await User.byEmail(email);
+
+        if (existing) {
+            throw new Error('Já existe um usuário com esse e-mail.');
+        }
+
+        const admin = await User.create({
+            name,
+            email,
+            password,
+            role: 'admin'
         });
-        totalItens.textContent = String(itens);
-        totalMedida.textContent = numero.format(medida);
-        valorTotal.textContent = moeda.format(valor);
-        listaVazia.hidden = itens > 0;
-        lista.closest('table').hidden = itens === 0;
-        const titulo = listaVazia.querySelector('h2');
-        const texto = listaVazia.querySelector('p');
-        if (linhas.length && itens === 0) {
-            titulo.textContent = 'Nenhum material encontrado';
-            texto.textContent = 'Nenhum item corresponde à busca.';
-        }
-        else {
-            titulo.textContent = 'Nenhum material encontrado';
-            texto.textContent = 'Cadastre um novo item para iniciar o controle.';
-        }
+
+        console.log('\nAdministrador criado com sucesso!');
+        console.log('Nome:', admin.name);
+        console.log('E-mail:', admin.email);
+        console.log('Perfil:', admin.role);
+
+    } finally {
+        rl.close();
+        await pool.end();
     }
-    selectTipo.addEventListener('change', atualizarTipo);
-    busca.addEventListener('input', atualizarLista);
-    atualizarTipo();
-    atualizarLista();
+}
+
+main().catch(error => {
+    console.error('\nErro:', error.message);
+    process.exitCode = 1;
 });

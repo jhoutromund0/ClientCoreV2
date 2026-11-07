@@ -39,30 +39,53 @@ function requireAuth(req, res, next) { if (!req.user)
 function requireRole(role) { return (req, res, next) => { if (!req.user)
     return res.redirect('/login'); if (req.user.role !== role)
     return res.status(403).render('pages/error', { title: 'Acesso negado', code: 403, message: 'Seu perfil não tem permissão para acessar esta área.' }); next(); }; }
-function csrf(req, res, next) {
-    if (['GET', 'HEAD', 'OPTIONS'].includes(req.method))
-        return next();
-    const origin = req.get('origin');
-    const host = req.get('host');
 
-    console.log('DEBUG ORIGIN:', origin);
-    console.log('DEBUG HOST:', host);
-    console.log('DEBUG APP_URL:', process.env.APP_URL);
+function csrf(req, res, next) {
+    if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+        return next();
+    }
+
+    const origin = req.get('origin');
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> c43c0e4 (Prepare project for Render deployment)
     if (origin) {
         try {
-            if (new URL(origin).host !== host)
+            const originUrl = new URL(origin);
+            const expectedHost = req.get('host');
+
+            const allowedHosts = [
+                expectedHost,
+                process.env.APP_URL ? new URL(process.env.APP_URL).host : null
+            ].filter(Boolean);
+
+            if (!['https:', 'http:'].includes(originUrl.protocol) ||
+                !allowedHosts.includes(originUrl.host)) {
                 return res.status(403).send('Origem inválida');
-        }
-        catch {
+            }
+        } catch {
             return res.status(403).send('Origem inválida');
         }
     }
-    if (!req.user)
+
+    if (!req.user) {
         return next();
+    }
+
     const value = req.body ? req.body._csrf : null;
-    if (typeof value !== 'string' || !req.csrfToken || value.length !== req.csrfToken.length || !crypto.timingSafeEqual(Buffer.from(value), Buffer.from(req.csrfToken)))
+
+    if (
+        typeof value !== 'string' ||
+        !req.csrfToken ||
+        value.length !== req.csrfToken.length ||
+        !crypto.timingSafeEqual(Buffer.from(value), Buffer.from(req.csrfToken))
+    ) {
         return res.status(403).send('Token de segurança inválido');
+    }
+
     next();
 }
+
 module.exports = { load, create, destroy, requireAuth, requireRole, csrf };
