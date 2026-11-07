@@ -1,18 +1,6 @@
-// Repositório em memória, como os modelos de visitas e materiais.
-const records = new Map();
-
-class FinancialRecord {
-  static find(visitId) {
-    return records.get(visitId);
-  }
-
-  static save(visitId, data) {
-    records.set(visitId, data);
-  }
-
-  static delete(visitId) {
-    records.delete(visitId);
-  }
-}
-
-module.exports = FinancialRecord;
+const store = require('../config/store');
+module.exports = class FinancialRecord {
+    static find(id) { return store.find('financial', id); }
+    static async save(id, data) { const existing = await store.find('financial', id); return existing ? store.update('financial', id, data) : store.create('financial', { ...data, id }); }
+    static delete(id) { return store.delete('financial', id); }
+};

@@ -1,1 +1,61 @@
-<main id="main-content" class="shell inner-page"><span class="eyebrow">PAINEL DE CONTROLE</span><h1>Visão geral da operação</h1><p class="lead narrow">Um ponto de partida para acompanhar os módulos do Client Core.</p><div class="stats-grid"><div class="stat-card"><span>Clientes cadastrados</span><strong><%= clientCount %></strong><small>Dados em memória nesta versão</small></div><div class="stat-card"><span>Materiais em estoque</span><strong><%= materialCount %></strong><small><a href="/materiais">Abrir materiais</a></small></div><div class="stat-card"><span>Visitas neste mês</span><strong><%= visitCount %></strong><small><a href="/calendario">Abrir calendário</a></small></div></div><div class="callout"><h2>Operação do mês</h2><p>Clientes, materiais e visitas técnicas já podem ser cadastrados. Os registros continuam em memória e serão perdidos quando o servidor reiniciar, até o MySQL ser habilitado.</p><a class="button" href="/calendario">Agendar uma visita →</a></div></main>
+<main id="main-content" class="shell inner-page">
+  <span class="eyebrow">
+    PAINEL DE CONTROLE
+  </span>
+  <h1>
+    Visão geral da operação
+  </h1>
+  <p class="lead narrow">
+    Um ponto de partida para acompanhar os módulos do Client Core.
+  </p>
+  <div class="stats-grid">
+    <div class="stat-card">
+      <span>
+        Clientes cadastrados
+      </span>
+      <strong>
+        <%= clientCount %>
+      </strong>
+      <small>
+        Dados do PostgreSQL
+      </small>
+    </div>
+    <div class="stat-card">
+      <span>
+        Materiais em estoque
+      </span>
+      <strong>
+        <%= materialCount %>
+      </strong>
+      <small>
+        <a href="/materiais">
+          Abrir materiais
+        </a>
+      </small>
+    </div>
+    <div class="stat-card">
+      <span>
+        Visitas neste mês
+      </span>
+      <strong>
+        <%= visitCount %>
+      </strong>
+      <small>
+        <a href="/calendario">
+          Abrir calendário
+        </a>
+      </small>
+    </div>
+  </div>
+  <div class="callout">
+    <h2>
+      Operação do mês
+    </h2>
+    <p>
+      Clientes, materiais e visitas técnicas já podem ser cadastrados. Os dados são armazenados no PostgreSQL.
+    </p>
+    <a class="button" href="/calendario">
+      Agendar uma visita →
+    </a>
+  </div>
+</main>

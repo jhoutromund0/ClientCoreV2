@@ -15,7 +15,7 @@
   </div>
 
   <div class="split-layout">
-    <form id="material-form" class="panel-form" method="post" action="<%= materialData && materialData.id ? '/materiais/' + materialData.id : '/materiais' %>" autocomplete="off">
+    <form id="material-form" class="panel-form" method="post" action="<%= materialData && materialData.id ? '/materiais/' + materialData.id : '/materiais' %><% if (typeof csrfToken !== "undefined" && csrfToken) { %><input type="hidden" name="_csrf" value="<%= csrfToken %>"><% } %>" autocomplete="off">
       <h2 id="form-title"><%= materialData && materialData.id ? 'Editar material' : 'Adicionar material' %></h2>
       <% if (errors && errors.length) { %>
         <div class="validation-errors" role="alert"><strong>Revise os campos:</strong><ul><% errors.forEach(error => { %><li><%= error.msg %></li><% }) %></ul></div>
@@ -93,6 +93,6 @@
       </div>
     </section>
   </div>
-  <p class="storage-note">ⓘ Nesta etapa, os dados ficam em memória e não são persistidos após reiniciar o servidor.</p>
+  <p class="storage-note">ⓘ Dados armazenados no PostgreSQL.</p>
 </main>
 <script src="/js/materials.js" defer></script>

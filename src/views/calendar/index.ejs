@@ -51,7 +51,7 @@
     <div id="visitas-do-dia" class="visit-grid"></div>
   </section>
 
-  <p class="storage-note">ⓘ Nesta etapa, os dados ficam em memória e não são persistidos após reiniciar o servidor.</p>
+  <p class="storage-note">ⓘ Dados armazenados no PostgreSQL.</p>
 </main>
 
 <div id="modal-agendar" class="modal" <%= visitDraft ? '' : 'hidden' %>>
@@ -66,7 +66,7 @@
     <% if (errors && errors.length) { %>
       <div class="validation-errors" role="alert"><strong>Revise os campos:</strong><ul><% errors.forEach(error => { %><li><%= error.msg %></li><% }) %></ul></div>
     <% } %>
-    <form id="form-visita" class="panel-form plain" method="post" action="<%= visitDraft && visitDraft.id ? '/calendario/' + visitDraft.id : '/calendario' %>">
+    <form id="form-visita" class="panel-form plain" method="post" action="<%= visitDraft && visitDraft.id ? '/calendario/' + visitDraft.id : '/calendario' %><% if (typeof csrfToken !== "undefined" && csrfToken) { %><input type="hidden" name="_csrf" value="<%= csrfToken %>"><% } %>">
       <div class="form-grid one-col">
         <label>Data
           <input id="visita-data" name="scheduledAt" type="date" value="<%= visitDraft ? (visitDraft.scheduledAt || '').slice(0, 10) : '' %>" required>

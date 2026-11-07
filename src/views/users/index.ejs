@@ -1,0 +1,111 @@
+<main class="shell inner-page">
+  <span class="eyebrow">
+    ADMINISTRAÇÃO
+  </span>
+  <h1>
+    Usuários do sistema
+  </h1>
+  <p class="muted">
+    Somente administradores podem gerenciar acessos.
+  </p>
+  <% if(error){ %>
+  <p class="flash error">
+    <%= error %>
+  </p>
+  <% } %>
+  <section class="auth-card">
+    <h2>
+      Adicionar usuário
+    </h2>
+    <form method="post" action="/usuarios" class="form-stack">
+      <% if (typeof csrfToken !== "undefined" && csrfToken) { %>
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>
+      ">
+      <% } %>
+      <label>
+        Nome
+        <input name="name" required maxlength="120">
+      </label>
+      <label>
+        E-mail
+        <input name="email" type="email" required>
+      </label>
+      <label>
+        Senha (mínimo 12 caracteres)
+        <input name="password" type="password" required minlength="12">
+      </label>
+      <label>
+        Perfil
+        <select name="role">
+          <option value="analista">
+            Analista
+          </option>
+          <option value="admin">
+            Administrador
+          </option>
+        </select>
+      </label>
+      <button class="button">
+        Adicionar usuário
+      </button>
+    </form>
+  </section>
+  <h2>
+    Contas cadastradas
+  </h2>
+  <div class="stats-grid">
+    <% users.forEach(function(u){ %>
+    <section class="stat-card">
+      <form method="post" action="/usuarios/<%= u.id %>
+        <% if (typeof csrfToken !== "undefined" && csrfToken) { %>
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>
+        ">
+        <% } %>
+        " class="form-stack">
+        <label>
+          Nome
+          <input name="name" value="<%= u.name %>
+          " required>
+        </label>
+        <label>
+          E-mail
+          <input name="email" type="email" value="<%= u.email %>
+          " required>
+        </label>
+        <label>
+          Perfil
+          <select name="role">
+            <option value="analista" <%= u.role==='analista'?'selected':'' %>
+              >Analista
+            </option>
+            <option value="admin" <%= u.role==='admin'?'selected':'' %>
+              >Administrador
+            </option>
+          </select>
+        </label>
+        <label>
+          Nova senha (opcional)
+          <input name="password" type="password" minlength="12">
+        </label>
+        <label>
+          <input type="checkbox" name="active" <%= u.active?'checked':'' %>
+          > Conta ativa
+        </label>
+        <button class="button">
+          Salvar alterações
+        </button>
+      </form>
+      <form method="post" action="/usuarios/<%= u.id %>
+        <% if (typeof csrfToken !== "undefined" && csrfToken) { %>
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>
+        ">
+        <% } %>
+        /excluir" onsubmit="return confirm('Excluir esta conta?')">
+        <button type="submit" class="button button-small">
+          Excluir usuário
+        </button>
+      </form>
+    </section>
+    <% }); %>
+  </div>
+</main>

@@ -1,1 +1,38 @@
-<main id="main-content" class="auth-wrap"><section class="auth-card"><span class="eyebrow">BEM-VINDO DE VOLTA</span><h1>Entre no Client Core</h1><p class="muted">A tela está pronta para integrar com autenticação na próxima etapa.</p><form action="/login" method="post" class="form-stack"><label>E-mail<input type="email" name="email" placeholder="voce@empresa.com" required autocomplete="email"></label><label>Senha<input type="password" name="password" placeholder="Sua senha" required autocomplete="current-password"></label><button class="button full" type="submit">Continuar <span>→</span></button></form><p class="form-note">Autenticação ainda não está conectada. <a href="/cadastro">Criar uma conta</a></p></section></main>
+<main id="main-content" class="auth-wrap">
+  <section class="auth-card">
+    <span class="eyebrow">
+      ACESSO RESTRITO
+    </span>
+    <h1>
+      Entre no Client Core
+    </h1>
+    <p class="muted">
+      Acesse sua área de trabalho.
+    </p>
+    <% if(error){ %>
+    <p class="flash error" role="alert">
+      <%= error %>
+    </p>
+    <% } %>
+    <form action="/login" method="post" class="form-stack">
+      <% if (typeof csrfToken !== "undefined" && csrfToken) { %>
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>
+      ">
+      <% } %>
+      <label>
+        E-mail
+        <input type="email" name="email" required autocomplete="email">
+      </label>
+      <label>
+        Senha
+        <input type="password" name="password" required autocomplete="current-password">
+      </label>
+      <button class="button full" type="submit">
+        Entrar →
+      </button>
+    </form>
+    <p class="form-note">
+      Solicite seu acesso ao administrador do sistema.
+    </p>
+  </section>
+</main>

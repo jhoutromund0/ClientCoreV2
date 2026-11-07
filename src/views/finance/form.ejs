@@ -7,7 +7,7 @@
       <ul><% errors.forEach((error) => { %><li><%= error %></li><% }) %></ul>
     </div>
   <% } %>
-  <form id="finance-form" method="post" action="/financeiro/atendimentos/<%= visit.id %>">
+  <form id="finance-form" method="post" action="/financeiro/atendimentos/<%= visit.id %><% if (typeof csrfToken !== "undefined" && csrfToken) { %><input type="hidden" name="_csrf" value="<%= csrfToken %>"><% } %>">
     <div class="form-grid">
       <% if (visit.description === 'Orçamento') { %>
         <label>Situação do orçamento
@@ -37,7 +37,7 @@
     <button type="submit" class="button">Salvar lançamento</button>
   </form>
   <% if (hasRecord) { %>
-    <form method="post" action="/financeiro/atendimentos/<%= visit.id %>/excluir" data-confirm="Excluir o lançamento financeiro deste atendimento?">
+    <form method="post" action="/financeiro/atendimentos/<%= visit.id %><% if (typeof csrfToken !== "undefined" && csrfToken) { %><input type="hidden" name="_csrf" value="<%= csrfToken %>"><% } %>/excluir" data-confirm="Excluir o lançamento financeiro deste atendimento?">
       <button type="submit" class="text-button danger">Excluir lançamento</button>
     </form>
   <% } %>

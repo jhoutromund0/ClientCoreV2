@@ -1,1 +1,74 @@
-<main id="main-content" class="shell inner-page form-page"><a class="back-link" href="/clientes">← Voltar para clientes</a><span class="eyebrow">GESTÃO DE CLIENTES</span><h1><%= clientData.id ? 'Editar cliente' : 'Cadastrar cliente' %></h1><p class="muted">Preencha os dados disponíveis. Os campos podem ser complementados posteriormente.</p><% if (errors && errors.length) { %><div class="validation-errors" role="alert"><strong>Revise os campos:</strong><ul><% errors.forEach(error => { %><li><%= error.msg %></li><% }) %></ul></div><% } %><form class="client-form" action="<%= clientData.id ? '/clientes/' + clientData.id : '/clientes' %>" method="post"><div class="form-grid"><label>Nome do contato / responsável *<input name="name" value="<%= clientData.name || '' %>" required maxlength="120" placeholder="Nome completo"></label><label>Empresa<input name="company" value="<%= clientData.company || '' %>" maxlength="160" placeholder="Nome da empresa"></label><label>CNPJ<span class="input-action"><input name="cnpj" value="<%= clientData.cnpj || '' %>" maxlength="18" inputmode="numeric" autocomplete="off" placeholder="00.000.000/0000-00"><button class="button button-small button-ghost" type="button" data-cnpj-lookup>Buscar dados</button></span></label><label>E-mail<input type="email" name="email" value="<%= clientData.email || '' %>" placeholder="contato@empresa.com"></label><label>Telefone<input type="tel" name="phone" value="<%= clientData.phone || '' %>" placeholder="(00) 00000-0000"></label></div><p class="lookup-status" data-cnpj-status role="status" aria-live="polite"></p><div class="form-actions"><a class="button button-ghost" href="/clientes">Cancelar</a><button class="button" type="submit"><%= clientData.id ? 'Salvar alterações' : 'Cadastrar cliente' %> →</button></div></form></main>
+<main id="main-content" class="shell inner-page form-page">
+  <a class="back-link" href="/clientes">
+    ← Voltar para clientes
+  </a>
+  <span class="eyebrow">
+    GESTÃO DE CLIENTES
+  </span>
+  <h1>
+    <%= clientData.id ? 'Editar cliente' : 'Cadastrar cliente' %>
+  </h1>
+  <p class="muted">
+    Preencha os dados disponíveis. Os campos podem ser complementados posteriormente.
+  </p>
+  <% if (errors && errors.length) { %>
+  <div class="validation-errors" role="alert">
+    <strong>
+      Revise os campos:
+    </strong>
+    <ul>
+      <% errors.forEach(error => { %>
+      <li>
+        <%= error.msg %>
+      </li>
+      <% }) %>
+    </ul>
+  </div>
+  <% } %>
+  <form class="client-form" action="<%= clientData.id ? '/clientes/' + clientData.id : '/clientes' %>
+    " method="post">
+    <div class="form-grid">
+      <label>
+        Nome do contato / responsável *
+        <input name="name" value="<%= clientData.name || '' %>
+        " required maxlength="120" placeholder="Nome completo">
+      </label>
+      <label>
+        Empresa
+        <input name="company" value="<%= clientData.company || '' %>
+        " maxlength="160" placeholder="Nome da empresa">
+      </label>
+      <label>
+        CNPJ
+        <span class="input-action">
+          <input name="cnpj" value="<%= clientData.cnpj || '' %>
+          " maxlength="18" inputmode="numeric" autocomplete="off" placeholder="00.000.000/0000-00">
+          <button class="button button-small button-ghost" type="button" data-cnpj-lookup>
+            Buscar dados
+          </button>
+        </span>
+      </label>
+      <label>
+        E-mail
+        <input type="email" name="email" value="<%= clientData.email || '' %>
+        " placeholder="contato@empresa.com">
+      </label>
+      <label>
+        Telefone
+        <input type="tel" name="phone" value="<%= clientData.phone || '' %>
+        " placeholder="(00) 00000-0000">
+      </label>
+    </div>
+    <p class="lookup-status" data-cnpj-status role="status" aria-live="polite">
+    </p>
+    <div class="form-actions">
+      <a class="button button-ghost" href="/clientes">
+        Cancelar
+      </a>
+      <button class="button" type="submit">
+        <%= clientData.id ? 'Salvar alterações' : 'Cadastrar cliente' %>
+        →
+      </button>
+    </div>
+  </form>
+</main>
