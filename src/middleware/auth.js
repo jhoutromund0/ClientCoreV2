@@ -44,6 +44,11 @@ function csrf(req, res, next) {
         return next();
     const origin = req.get('origin');
     const host = req.get('host');
+
+    console.log('DEBUG ORIGIN:', origin);
+    console.log('DEBUG HOST:', host);
+    console.log('DEBUG APP_URL:', process.env.APP_URL);
+    
     if (origin) {
         try {
             if (new URL(origin).host !== host)
