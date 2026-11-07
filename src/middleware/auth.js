@@ -46,11 +46,6 @@ function csrf(req, res, next) {
     }
 
     const origin = req.get('origin');
-<<<<<<< HEAD
-    
-=======
-
->>>>>>> c43c0e4 (Prepare project for Render deployment)
     if (origin) {
         try {
             const originUrl = new URL(origin);
