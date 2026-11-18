@@ -3,8 +3,12 @@
   <%- include('nav', { section: 'travel' }) %>
   <p class="muted">O valor do deslocamento considera a distância de ida e volta. Quando o responsável tem uma tarifa individual, ela é usada na visita.</p>
 
-  <% if (!locationsConfigured) { %>
-  <p class="muted" role="status">O cálculo de deslocamentos está indisponível no momento.</p>
+  <% if (routeErrors.length) { %>
+  <div class="validation-errors" role="status">
+    <strong>Configuração do cálculo automático</strong>
+    <ul><% routeErrors.forEach(error => { %><li><%= error %></li><% }) %></ul>
+    <p>A quilometragem pode ser informada manualmente na visita.</p>
+  </div>
   <% } %>
 
   <% if (errors.length) { %>

@@ -3,7 +3,7 @@ const location = require('../services/locationService');
 
 function renderForm(res, settings, errors = []) {
     return res.status(errors.length ? 422 : 200).render('settings/index', {
-        title: 'Configurações', settings, errors, locationsConfigured: location.isConfigured()
+        title: 'Configurações', settings, errors, routeErrors: location.configurationErrors()
     });
 }
 

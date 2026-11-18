@@ -119,10 +119,12 @@ Em **Configurações**, o administrador define o endereço de partida e a tarifa
 Em **Configurações → Usuários**, o administrador pode definir uma tarifa individual por quilômetro. A tarifa padrão da empresa é usada quando a conta não tem tarifa própria. Na edição da visita, é possível informar a quilometragem manualmente e selecionar quem recebe o deslocamento entre os responsáveis. Com um único responsável, a atribuição é automática. O valor a pagar aparece em **Visitas** e entra nas despesas do financeiro. A cobrança ao cliente fica no campo próprio do lançamento.
 
 1. Execute `npm run db:migrate` com `DATABASE_URL` configurada para aplicar as migrações, incluindo a tabela de configuração de deslocamentos.
-2. Defina `NOMINATIM_BASE_URL` e `OSRM_BASE_URL` no ambiente do servidor com as URLs de instâncias próprias ou contratadas. O Nominatim deve oferecer `/search`. O OSRM deve oferecer `/table/v1/driving` e, se a matriz não incluir distâncias, `/route/v1/driving`. `OSM_USER_AGENT` permite identificar a instalação nos pedidos aos serviços.
+2. Use as URLs-base reais de serviços próprios ou contratados em `NOMINATIM_BASE_URL` e `OSRM_BASE_URL`. Cada valor é a URL antes do caminho da operação. O ClientCore acrescenta `/search` para geocodificação e `/table/v1/driving` ou `/route/v1/driving` para distâncias. `OSM_USER_AGENT` é opcional e permite identificar a instalação nos pedidos aos serviços.
 3. Inicie a aplicação e preencha a tarifa em **Configurações**. O endereço inicial já aparece no formulário.
 
 O processamento de carteiras de clientes usa instâncias adequadas a consultas recorrentes. Consulte a [política do Nominatim público](https://operations.osmfoundation.org/policies/nominatim/) e a [documentação da API de rotas do OSRM](https://project-osrm.org/docs/v5.24.0/api/).
+
+No Render, abra **ClientCore → Environment** e salve as duas variáveis no serviço. Use o `.env` para a execução local. Se ainda precisar contratar ou hospedar os serviços, deixe os dois valores vazios e informe a quilometragem na edição da visita. A tela de configurações indica quais valores precisam de atenção. [Variáveis de ambiente no Render](https://render.com/docs/configure-environment-variables#in-the-render-dashboard)
 
 ## 🛠️ Tecnologias Utilizadas
 

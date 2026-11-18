@@ -5,6 +5,7 @@ const PUBLIC_HOSTS = new Set([
     'map.project-osrm.org',
     'test.project-osrm.org'
 ]);
+const LOCATION_URLS = ['NOMINATIM_BASE_URL', 'OSRM_BASE_URL'];
 const TIMEOUT_MS = 8000;
 const USER_AGENT = 'ClientCoreV2/1.0 (+https://github.com/jhoutromund0/ClientCoreV2)';
 const STATES = {
@@ -37,23 +38,29 @@ function baseUrl(variable) {
     catch {
         throw new LocationError(`Configure ${variable} com o endereço do serviço de localização.`, 503);
     }
-    if (PUBLIC_HOSTS.has(url.hostname.replace(/\.$/, '')))
+    const hostname = url.hostname.replace(/\.$/, '');
+    if (hostname === 'example' || hostname.endsWith('.example'))
+        throw new LocationError(`Substitua o endereço de exemplo em ${variable} pela URL-base do seu serviço.`, 503);
+    if (PUBLIC_HOSTS.has(hostname))
         throw new LocationError(`Use uma instância própria ou contratada em ${variable} para consultar endereços em lote.`, 503);
     if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password || url.hash)
         throw new LocationError(`O endereço configurado em ${variable} é inválido.`, 503);
     return url;
 }
 
-function isConfigured() {
-    try {
-        baseUrl('NOMINATIM_BASE_URL');
-        baseUrl('OSRM_BASE_URL');
-        return true;
+function configurationErrors() {
+    const errors = [];
+    for (const variable of LOCATION_URLS) {
+        try {
+            baseUrl(variable);
+        } catch (error) {
+            errors.push(error.message);
+        }
     }
-    catch {
-        return false;
-    }
+    return errors;
 }
+
+const isConfigured = () => configurationErrors().length === 0;
 
 function endpoint(variable, path, params) {
     const url = baseUrl(variable);
@@ -227,4 +234,4 @@ async function drivingDistances(origin, destination) {
     return { outboundMeters, returnMeters };
 }
 
-module.exports = { geocode, drivingDistances, isConfigured, LocationError };
+module.exports = { geocode, drivingDistances, isConfigured, configurationErrors, LocationError };
