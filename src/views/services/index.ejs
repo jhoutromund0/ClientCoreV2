@@ -1,0 +1,68 @@
+<main id="main-content" class="shell inner-page">
+  <h1>Serviços</h1>
+  <%- include('../settings/nav', { section: 'services' }) %>
+
+  <div class="split-layout">
+    <form class="panel-form" method="post" action="<%= service?.id ? '/configuracoes/servicos/' + service.id : '/configuracoes/servicos' %>" aria-labelledby="service-form-title">
+      <%- include('../partials/csrf-field') %>
+      <h2 id="service-form-title"><%= service?.id ? 'Editar serviço' : 'Cadastrar serviço' %></h2>
+      <% if (errors.length) { %>
+      <div class="validation-errors" role="alert">
+        <ul><% errors.forEach(error => { %><li><%= error %></li><% }) %></ul>
+      </div>
+      <% } %>
+      <div class="form-grid one-col">
+        <label>Nome
+          <input name="name" value="<%= service?.name ?? '' %>" maxlength="120" required>
+        </label>
+        <label>Descrição
+          <textarea name="description" maxlength="2000" rows="4" required><%= service?.description ?? '' %></textarea>
+        </label>
+        <label>Valor padrão (R$)
+          <input name="price" inputmode="decimal" maxlength="9" value="<%= service?.price ?? '' %>" required>
+        </label>
+      </div>
+      <div class="form-actions">
+        <% if (service?.id) { %><a class="button button-ghost" href="/configuracoes/servicos">Cancelar edição</a><% } %>
+        <button class="button" type="submit">Salvar serviço</button>
+      </div>
+    </form>
+
+    <section class="panel" aria-labelledby="service-catalog-title">
+      <div class="panel-head">
+        <h2 id="service-catalog-title">Catálogo de serviços</h2>
+        <form method="get" action="/configuracoes/servicos" class="search-field">
+          <label for="service-search">Buscar serviço</label>
+          <input id="service-search" name="busca" type="search" value="<%= search %>" maxlength="120">
+          <button class="button button-ghost" type="submit">Buscar</button>
+        </form>
+      </div>
+      <% if (page.items.length) { %>
+      <div class="table-wrap" tabindex="0" role="region" aria-label="Serviços cadastrados">
+        <table>
+          <thead><tr><th>Serviço</th><th>Valor padrão</th><th>Status</th><th>Ações</th></tr></thead>
+          <tbody>
+            <% page.items.forEach(item => { %>
+            <tr>
+              <td><strong><%= item.name %></strong></td>
+              <td><%= formatPrice(item.priceCents) %></td>
+              <td><%= item.active ? 'Ativo' : 'Desativado' %></td>
+              <td class="actions">
+                <a href="/configuracoes/servicos/<%= item.id %>/editar">Editar</a>
+                <form method="post" action="/configuracoes/servicos/<%= item.id %>/<%= item.active ? 'desativar' : 'reativar' %>"<% if (item.active) { %> data-confirm="Desativar este serviço para novos atendimentos?"<% } %>>
+                  <%- include('../partials/csrf-field') %>
+                  <button class="text-button<%= item.active ? ' danger' : '' %>" type="submit"><%= item.active ? 'Desativar' : 'Reativar' %></button>
+                </form>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <% } else { %>
+      <p class="muted"><%= search ? 'Nenhum serviço corresponde à busca.' : 'Cadastre um serviço para disponibilizá-lo no calendário.' %></p>
+      <% } %>
+      <%- include('../partials/pagination', { page, path: '/configuracoes/servicos', params: search ? { busca: search } : {} }) %>
+    </section>
+  </div>
+</main>

@@ -83,8 +83,9 @@ function rankMaterials(visits, financialByVisit) {
         // A vírgula entre dois dígitos pode fazer parte de uma medida.
         const listed = text(visit.materials).split(/[;\r\n]+|(?<!\d),|,(?!\d)/);
         const billed = Array.isArray(record?.items) ? record.items.map((item) => item?.name) : [];
+        const consumed = (visit.materialsUsed ?? []).filter(item => item.consumedQuantity > 0).map(item => item.name);
         const seen = new Set();
-        for (const name of [...billed, ...listed]) {
+        for (const name of [...consumed, ...billed, ...listed]) {
             const material = key(name);
             if (!material || seen.has(material))
                 continue;
@@ -151,11 +152,12 @@ async function load(requestedPeriod, now = new Date()) {
     const toIso = value => new Date(value).toISOString().slice(0, 10);
     const [entries, users, settings] = await Promise.all([
         Visit.dashboardData(toIso(Math.min(dates.start, dates.monthStart)), toIso(dates.end)),
-        query('SELECT name, email, role FROM users WHERE role = $1', ['analista']),
+        query('SELECT id, name, email, role FROM users WHERE role = $1', ['analista']),
         TransportSettings.get()
     ]);
     const financialByVisit = new Map(entries.map(({ visit, record }) => [visit.id, record]));
     const userAliases = indexAliases(users.rows, (user) => [user.name, user.email]);
+    const usersById = new Map(users.rows.map(user => [user.id, user]));
     const bars = attendanceBars(dates.start, dates.end, barInterval);
     const appointments = [];
     const monthlyVisits = [];
@@ -163,23 +165,28 @@ async function load(requestedPeriod, now = new Date()) {
 
     for (const { visit, client } of entries) {
         const day = visitDay(visit.scheduledAt);
-        if (!Number.isFinite(day))
+        if (!Number.isFinite(day) || visit.status === 'cancelada')
             continue;
         if (day >= dates.monthStart && day <= dates.today)
             monthlyVisits.push(visit);
         if (day < dates.start || day > dates.end)
             continue;
-        const technicians = readTechnicians(visit.technicians, userAliases);
+        const technicians = visit.assignees?.length ? {
+            people: new Set(visit.assignees.map(person => usersById.get(person.id)).filter(Boolean)),
+            label: visit.assignees.map(person => withoutEmail(person.name)).filter(Boolean).join(', ')
+        } : readTechnicians(visit.technicians, userAliases);
+        const time = /^\d{4}-\d{2}-\d{2}[T ](\d{2}:\d{2})/.exec(visit.scheduledAt)?.[1];
         appointments.push({
-            dateLabel: dateLabel.format(day), clientName: visit.clientName, description: visit.description,
+            dateLabel: time ? `${dateLabel.format(day)} ${time}` : dateLabel.format(day), clientName: visit.clientName, description: visit.description,
             technicians: technicians.label
         });
         const dayIndex = (day - dates.start) / DAY_MS;
         bars[Math.floor(dayIndex / barInterval)].count++;
 
-        if (day > dates.today || !technicians.people.size)
+        if (day > dates.today || !technicians.people.size || (visit.hasOperationalStatus && visit.status !== 'concluida'))
             continue;
-        const meters = routeMeters(client, settings.originAddress);
+        const meters = routeMeters(visit, settings.originAddress) ??
+            (visit.address === client.address ? routeMeters(client, settings.originAddress) : null);
         if (meters === null)
             continue;
         const millimeters = Math.round(meters * 1000);

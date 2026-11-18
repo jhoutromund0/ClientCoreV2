@@ -19,8 +19,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updatePreview() {
-        let cost = 0;
-        let charge = decimal(form.elements.labor.value, moneyPattern, 2);
+        let cost = Number(form.dataset.stockCost) + Number(form.dataset.travelCost) + decimal(form.elements.otherCost.value, moneyPattern, 2);
+        let charge = Number(form.dataset.stockCharge) + decimal(form.elements.labor.value, moneyPattern, 2) + decimal(form.elements.travelCharge.value, moneyPattern, 2);
         const received = decimal(form.elements.received.value, moneyPattern, 2);
         for (const row of items.querySelectorAll('[data-material-row]')) {
             const quantity = decimal(row.querySelector('[name=quantity]').value, quantityPattern, 3);
@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
             charge += Math.round(quantity * decimal(row.querySelector('[name=price]').value, moneyPattern, 2) / 1000);
         }
 
-        if ([cost, charge, received].some(Number.isNaN)) {
+        if (![cost, charge, received].every(Number.isSafeInteger)) {
             preview.textContent = 'Preencha os valores para calcular os totais.';
             return;
         }
@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
             preview.textContent = 'O valor recebido deve ser menor ou igual ao total a cobrar.';
             return;
         }
-        preview.textContent = `Custo de materiais ${money.format(cost / 100)} · Total a cobrar ${money.format(charge / 100)} · Saldo ${money.format((charge - received) / 100)}`;
+        preview.textContent = `Despesas ${money.format(cost / 100)} · Total a cobrar ${money.format(charge / 100)} · A receber ${money.format((charge - received) / 100)} · Saldo após despesas ${money.format((received - cost) / 100)}`;
     }
 
     function update() {
@@ -74,9 +74,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (request.signal.aborted)
                     return;
                 const placeholder = new Option(materials.length ? 'Selecione um material' : 'Nenhum material encontrado', '');
-                const options = materials.map(({ id, name, unit, unitValue }) => {
+                const options = materials.map(({ id, name, unit, unitValue, unitPrice }) => {
                     const option = new Option(name, id);
-                    Object.assign(option.dataset, { name, unit, cost: unitValue.toFixed(2) });
+                    Object.assign(option.dataset, { name, unit, cost: unitValue.toFixed(2), price: unitPrice.toFixed(2) });
                     return option;
                 });
                 select.replaceChildren(placeholder, ...options);
@@ -122,10 +122,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const select = event.target;
         if (select.matches('[data-catalog]') && select.value) {
             const row = select.closest('[data-material-row]');
-            const { name, unit, cost } = select.selectedOptions[0].dataset;
+            const { name, unit, cost, price } = select.selectedOptions[0].dataset;
             row.querySelector('[name=name]').value = name;
             row.querySelector('[name=unit]').value = unit;
             row.querySelector('[name=cost]').value = cost;
+            row.querySelector('[name=price]').value = price;
             row.querySelector('[name=origin]').value = 'estoque';
         }
         updatePreview();

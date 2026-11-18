@@ -1,7 +1,13 @@
 <main class="shell inner-page" id="main-content">
   <span class="eyebrow">GESTÃO DE ATENDIMENTOS</span>
   <h1>Financeiro</h1>
-  <p class="lead">Acompanhe orçamentos, cobranças e custos de materiais por atendimento.</p>
+  <p class="lead">Acompanhe os recebimentos e custos de serviços, materiais e deslocamentos.</p>
+
+  <div class="stats-grid finance-stats">
+    <div class="stat-card"><span>Receitas recebidas</span><strong><%= formatMoney(balance.received) %></strong></div>
+    <div class="stat-card"><span>Despesas operacionais</span><strong><%= formatMoney(balance.cost) %></strong></div>
+    <div class="stat-card"><span>Saldo após despesas</span><strong><%= formatMoney(balance.balance) %></strong></div>
+  </div>
 
   <% if (!entries.length) { %>
     <p>Agende um atendimento no calendário para iniciar um lançamento.</p>
@@ -10,18 +16,19 @@
     <div class="table-wrap">
       <table>
         <thead>
-          <tr><th>Cliente</th><th>Atendimento</th><th>Situação</th><th>Materiais (custo)</th><th>Valor previsto ou a cobrar</th><th>Recebido</th><th>Ação</th></tr>
+          <tr><th>Cliente</th><th>Atendimento</th><th>Situação</th><th>Despesas</th><th>Valor previsto ou a cobrar</th><th>Recebido</th><th>A receber</th><th>Ação</th></tr>
         </thead>
         <tbody>
           <% entries.forEach(({ visit, record }) => { %>
             <tr>
               <td><%= visit.clientName %></td>
               <td><%= visit.description %> · <%= visit.scheduledAt.slice(0, 10).split('-').reverse().join('/') %></td>
-              <td><%= record ? (statuses[record.status] || 'Serviço') : 'Sem lançamento' %></td>
+              <td><%= visit.status === 'cancelada' ? 'Cancelada' : record?.billingFinalized === false ? 'Previsão' : record ? (statuses[record.status] || 'Serviço') : 'Sem lançamento' %></td>
               <td><%= record ? formatMoney(record.cost) : '—' %></td>
               <td><%= record ? formatMoney(record.charge) : '—' %></td>
               <td><%= record ? formatMoney(record.received) : '—' %></td>
-              <td><a class="text-button" href="/financeiro/atendimentos/<%= visit.id %>"><%= record ? 'Editar' : 'Lançar valores' %></a></td>
+              <td><%= record && record.billingFinalized !== false && !['pendente', 'recusado'].includes(record.status) ? formatMoney(record.charge - record.received) : '—' %></td>
+              <td><a class="text-button" href="/financeiro/atendimentos/<%= visit.id %>"><%= visit.status === 'cancelada' ? 'Consultar' : record ? 'Editar' : 'Lançar valores' %></a></td>
             </tr>
           <% }) %>
         </tbody>

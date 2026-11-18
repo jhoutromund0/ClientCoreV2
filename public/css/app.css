@@ -812,12 +812,6 @@ td .travel-status {
   font-size:10px
 }
 @media(max-width:850px) {
-  .site-header {
-    gap:15px
-  }
-  .main-nav {
-    gap:6px 14px
-  }
   .hero {
     grid-template-columns:1fr;
     gap:25px;
@@ -847,10 +841,7 @@ td .travel-status {
     grid-template-columns:1fr 1fr
   }
 }
-@media(max-width:620px) {
-  .shell {
-    width:calc(100% - 34px)
-  }
+@media(max-width:900px) {
   .site-header {
     height:70px;
     padding:0 17px;
@@ -894,6 +885,11 @@ td .travel-status {
   }
   .button-small {
     padding:9px 10px
+  }
+}
+@media(max-width:620px) {
+  .shell {
+    width:calc(100% - 34px)
   }
   .hero {
     padding-top:52px;
@@ -1018,6 +1014,85 @@ td .travel-status {
   min-width:0;
   margin:0
 }
+.finance-stats {
+  margin-bottom:24px
+}
+.finance-stats strong {
+  font-size:clamp(22px,4vw,34px);
+  overflow-wrap:anywhere
+}
+.finance-section {
+  margin-top:24px
+}
+.module-links {
+  margin-bottom:12px;
+  flex-wrap:wrap
+}
+.record-details {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));
+  gap:12px 20px;
+  margin:12px 0;
+  overflow-wrap:anywhere
+}
+.record-details dt {
+  color:var(--muted);
+  font-size:12px
+}
+.record-details dd {
+  margin:4px 0 0
+}
+.action-group,.visit-card-heading {
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:8px 12px
+}
+.visit-card-heading {
+  justify-content:space-between
+}
+.visit-card .visit-card-heading p {
+  margin:0
+}
+.visit-state {
+  display:inline-block;
+  padding:3px 9px;
+  border:1px solid var(--line);
+  border-radius:99px;
+  color:var(--text);
+  font-size:12px;
+  white-space:nowrap
+}
+.visit-state-concluida {
+  color:var(--green);
+  border-color:#83e29a55
+}
+.visit-state-cancelada {
+  color:var(--muted)
+}
+.visit-editor {
+  gap:24px;
+  margin-top:24px
+}
+.visit-editor fieldset {
+  min-width:0;
+  margin:0;
+  padding:14px;
+  border:1px solid var(--line);
+  border-radius:10px
+}
+.visit-editor input[type=checkbox] {
+  width:auto;
+  accent-color:var(--green)
+}
+.split-layout.visit-detail-layout {
+  grid-template-columns:repeat(2,minmax(0,1fr))
+}
+@media(max-width:620px) {
+  .split-layout.visit-detail-layout {
+    grid-template-columns:1fr
+  }
+}
 #finance-add,
 #finance-form + form {
   margin-top:16px
@@ -1038,6 +1113,9 @@ td .travel-status {
   align-items:start;
   margin-top:22px
 }
+.split-layout>* {
+  min-width:0
+}
 .stack {
   display:grid;
   gap:12px
@@ -1055,6 +1133,7 @@ td .travel-status {
 }
 .panel-head {
   display:flex;
+  flex-wrap:wrap;
   justify-content:space-between;
   align-items:flex-start;
   gap:16px;
@@ -1179,7 +1258,7 @@ td .travel-status {
   outline-offset:2px
 }
 .search-field {
-  min-width:220px
+  min-width:min(220px,100%)
 }
 .month-nav {
   display:flex;
@@ -1193,14 +1272,16 @@ td .travel-status {
   font-weight:700;
   text-transform:capitalize
 }
-.month-nav button,.agendar-dia {
+.month-nav button,.month-nav .month-step,.agendar-dia {
   border:1px solid #3a4138;
   background:#101410;
   color:#e5e7e1;
   border-radius:10px;
   cursor:pointer
 }
-.month-nav button {
+.month-nav button,.month-nav .month-step {
+  display:grid;
+  place-items:center;
   width:36px;
   height:36px;
   font-size:18px
@@ -1246,11 +1327,13 @@ td .travel-status {
   font-weight:700
 }
 .agendar-dia {
+  display:grid;
+  place-items:center;
   width:26px;
   height:26px;
   border-radius:50%
 }
-.agendar-dia:hover,.month-nav button:hover {
+.agendar-dia:hover,.month-nav button:hover,.month-nav .month-step:hover {
   background:#ffffff10
 }
 .day-visits {

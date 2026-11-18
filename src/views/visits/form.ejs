@@ -1,0 +1,105 @@
+<main id="main-content" class="shell inner-page form-page">
+  <a class="back-link" href="<%= returnTo %>">Voltar para <%= source === 'visitas' ? 'visitas' : 'o calendário' %></a>
+  <h1><%= visit ? 'Editar visita' : 'Nova visita' %></h1>
+  <% if (errors.length) { %>
+  <div class="validation-errors" role="alert">
+    <ul><% errors.forEach(error => { %><li><%= error %></li><% }) %></ul>
+  </div>
+  <% } %>
+
+  <form class="panel-form visit-editor stack" method="post" action="<%= visit ? '/calendario/' + visit.id : '/calendario' %>" data-visit-form>
+    <%- include('../partials/csrf-field') %>
+    <input type="hidden" name="recursos" value="1">
+    <input type="hidden" name="retorno" value="<%= source %>">
+    <% if (visit) { %><input type="hidden" name="revision" value="<%= draft.revision || '' %>"><% } %>
+
+    <section class="stack" aria-labelledby="visit-schedule">
+      <h2 id="visit-schedule">Agendamento</h2>
+      <div class="form-grid">
+        <label>Data<input type="date" name="scheduledDate" value="<%= draft.scheduledDate %>" min="1000-01-01" max="9999-12-31" required></label>
+        <label>Horário<input type="time" name="scheduledTime" value="<%= draft.scheduledTime %>" <%= !visit ? 'required' : '' %>></label>
+      </div>
+      <div class="form-grid">
+        <div class="stack" data-visit-lookup-group>
+          <label>Buscar cliente<input type="search" maxlength="160" autocomplete="off" data-visit-lookup="/calendario/clientes"></label>
+          <label>Cliente
+            <select name="clientId" required>
+              <option value="">Selecione um cliente</option>
+              <% clients.forEach(client => { %><option value="<%= client.id %>" data-address="<%= client.address %>" <%= client.id === draft.clientId ? 'selected' : '' %>><%= client.label %></option><% }) %>
+            </select>
+          </label>
+          <small class="form-hint muted" role="status"></small>
+        </div>
+        <div class="stack" data-visit-lookup-group>
+          <label>Buscar serviço<input type="search" maxlength="160" autocomplete="off" data-visit-lookup="/calendario/servicos"></label>
+          <label>Serviço
+            <select name="serviceId" <%= !visit || !visit.description ? 'required' : '' %>>
+              <option value=""><%= draft.description && !draft.serviceId ? draft.description + ' (registro anterior)' : 'Selecione um serviço' %></option>
+              <% services.forEach(service => { %><option value="<%= service.id %>" <%= service.id === draft.serviceId ? 'selected' : '' %>><%= service.name %></option><% }) %>
+            </select>
+          </label>
+          <small class="form-hint muted" role="status"></small>
+        </div>
+      </div>
+      <% if (!services.length && !visit?.description) { %>
+      <p class="muted"><% if (canPrice) { %><a class="text-button" href="/configuracoes/servicos">Cadastre um serviço ativo</a> para agendar.<% } else { %>Solicite a um administrador o cadastro de um serviço para agendar.<% } %></p>
+      <% } %>
+      <label>Endereço do atendimento
+        <input name="address" value="<%= draft.address || '' %>" maxlength="300" autocomplete="street-address" aria-describedby="visit-address-hint">
+      </label>
+      <p class="muted form-hint" id="visit-address-hint">Preencha um endereço diferente quando a visita ocorrer em outro local. Se o campo ficar em branco, será usado o endereço do cliente.</p>
+      <div class="form-grid">
+        <label>Situação
+          <select name="status">
+            <% Object.entries(statuses).forEach(([key, label]) => { if (visit?.status === 'concluida' && key !== 'concluida') return; %>
+            <option value="<%= key %>" <%= draft.status === key ? 'selected' : '' %>><%= label %></option>
+            <% }) %>
+          </select>
+        </label>
+        <% if (canPrice) { %>
+        <label>Valor do serviço nesta visita (R$)
+          <input name="servicePrice" inputmode="decimal" value="<%= draft.servicePrice %>" maxlength="9"
+            placeholder="<%= visit?.servicePriceCents == null ? 'Valor padrão do serviço' : (visit.servicePriceCents / 100).toFixed(2).replace('.', ',') %>">
+        </label>
+        <% } %>
+      </div>
+    </section>
+
+    <section class="stack" aria-labelledby="visit-assignees">
+      <h2 id="visit-assignees">Responsáveis</h2>
+      <div class="stack" data-visit-lookup-group>
+        <label>Buscar usuário<input type="search" maxlength="160" autocomplete="off" data-visit-lookup="/calendario/responsaveis"></label>
+        <label>Usuários responsáveis
+          <select name="assigneeId" size="5" multiple>
+            <% assignees.forEach(account => { %><option value="<%= account.id %>" <%= draft.assigneeIds.includes(account.id) ? 'selected' : '' %>><%= account.name %><%= account.active === false ? ' (inativo)' : '' %></option><% }) %>
+          </select>
+        </label>
+        <small class="muted" role="status"></small>
+      </div>
+      <% if (visit?.technicians && !visit.assignees.length) { %><p class="muted">Responsáveis informados no registro anterior: <%= visit.technicians %></p><% } %>
+    </section>
+
+    <section class="stack" aria-labelledby="visit-materials">
+      <h2 id="visit-materials">Materiais</h2>
+      <p class="muted form-hint">A quantidade utilizada será baixada do estoque quando o consumo for confirmado na conclusão da visita.</p>
+      <% if (visit?.materials && !visit.materialsUsed.length) { %><p class="muted">Materiais informados no registro anterior: <%= visit.materials %></p><% } %>
+      <div class="stack" data-visit-materials>
+        <% draft.materials.forEach(line => { %><%- include('material-line', { line, materials }) %><% }) %>
+      </div>
+      <template data-visit-material-template><%- include('material-line', {
+          line: { materialId: '', plannedQuantity: '', usedQuantity: '' }, materials
+      }) %></template>
+      <div class="action-group"><button class="button button-ghost" type="button" data-visit-material-add>Adicionar material</button></div>
+      <label class="user-active">
+        <input type="checkbox" name="confirmConsumption" <%= draft.confirmed ? 'checked' : '' %>>
+        Confirmo as quantidades utilizadas para a conclusão ou correção do consumo.
+      </label>
+    </section>
+
+    <div class="form-actions">
+      <a class="button button-ghost" href="<%= returnTo %>">Voltar</a>
+      <button class="button" type="submit"><%= visit ? 'Salvar alterações' : 'Salvar visita' %></button>
+    </div>
+  </form>
+</main>
+<script src="/js/calendar.js" defer></script>

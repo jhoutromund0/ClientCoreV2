@@ -1,187 +1,106 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const dataNode = document.getElementById('calendar-data');
-    const grid = document.getElementById('calendario-grid');
-    if (!dataNode || !grid)
+    const form = document.querySelector('[data-visit-form]');
+    if (!form)
         return;
-    const payload = JSON.parse(dataNode.textContent);
-    const visitas = payload.visits || [];
-    const totalVisitasMes = document.getElementById('total-visitas-mes');
-    const mesAno = document.getElementById('mes-ano');
-    const lista = document.getElementById('visitas-do-dia');
-    const modal = document.getElementById('modal-agendar');
-    const form = document.getElementById('form-visita');
-    const csrfToken = form.querySelector('input[name="_csrf"]')?.value || '';
-    const titulo = document.getElementById('modal-title');
-    const modalData = document.getElementById('modal-data');
-    const campoData = document.getElementById('visita-data');
-    const campoCliente = document.getElementById('visita-cliente');
-    const clienteId = document.getElementById('visita-cliente-id');
-    const opcoesClientes = document.getElementById('clientes-list');
-    const campoTipo = document.getElementById('visita-tipo');
-    const campoMateriais = document.getElementById('visita-materiais');
-    const campoTecnicos = document.getElementById('visita-tecnicos');
-    const [year, month] = payload.month.split('-').map(Number);
-    const hoje = new Date();
-    const fmtData = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    const fmtMes = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' });
-    function esc(value) {
-        return String(value ?? '').replace(/[&<>"']/g, (char) => ({
-            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-        }[char]));
-    }
-    function iso(date) {
-        const y = date.getFullYear();
-        const m = String(date.getMonth() + 1).padStart(2, '0');
-        const d = String(date.getDate()).padStart(2, '0');
-        return `${y}-${m}-${d}`;
-    }
-    function parseIso(value) {
-        const [y, m, d] = String(value).slice(0, 10).split('-').map(Number);
-        const date = new Date(y, m - 1, d);
-        return iso(date) === String(value).slice(0, 10) ? date : null;
-    }
-    function rotuloData(value) {
-        const date = parseIso(value);
-        return date ? fmtData.format(date) : 'Data inválida';
-    }
-    function abrirModal(date, visita) {
-        form.action = visita ? `/calendario/${visita.id}` : '/calendario';
-        titulo.textContent = visita ? 'Editar visita' : 'Agendar visita';
-        modalData.textContent = visita
-            ? `Editando visita de ${visita.clientName}`
-            : `Data selecionada: ${fmtData.format(date)}`;
-        campoData.value = visita ? visita.scheduledAt.slice(0, 10) : iso(date);
-        campoCliente.value = visita ? visita.clientName : '';
-        clienteId.value = visita ? visita.clientId : '';
-        campoTipo.value = visita ? visita.description : '';
-        campoMateriais.value = visita ? (visita.materials || '') : '';
-        campoTecnicos.value = visita ? (visita.technicians || '') : '';
-        modal.hidden = false;
-        campoCliente.focus();
-    }
-    function fecharModal() {
-        modal.hidden = true;
-    }
-    function renderMonth() {
-        mesAno.textContent = fmtMes.format(new Date(year, month - 1, 1));
-        totalVisitasMes.textContent = String(Object.values(payload.days).reduce((total, day) => total + day.count, 0));
-        const firstDay = new Date(year, month - 1, 1).getDay();
-        const days = new Date(year, month, 0).getDate();
-        grid.innerHTML = '';
-        for (let blank = 0; blank < firstDay; blank += 1) {
-            const placeholder = document.createElement('div');
-            placeholder.className = 'day-cell blank';
-            grid.appendChild(placeholder);
-        }
-        for (let day = 1; day <= days; day += 1) {
-            const date = new Date(year, month - 1, day);
-            const doDia = payload.days[iso(date)];
-            const isToday = iso(hoje) === iso(date);
-            const cell = document.createElement('div');
-            cell.className = `day-cell${isToday ? ' today' : ''}`;
-            cell.innerHTML = `
-        <div class="day-top">
-          <span>${day}</span>
-          <button type="button" class="agendar-dia" data-day="${day}" aria-label="Agendar visita no dia ${day}">+</button>
-        </div>
-        <div class="day-visits">
-          ${doDia ? `<span class="visit-count">${doDia.count} visita${doDia.count > 1 ? 's' : ''}</span>` : ''}
-          ${doDia ? doDia.preview.map((visita) => `<div class="day-chip"><strong>${esc(visita.clientName)}</strong><span>${esc(visita.description)}</span></div>`).join('') : ''}
-        </div>
-      `;
-            grid.appendChild(cell);
-        }
-    }
-    function renderVisits() {
-        if (!visitas.length) {
-            lista.innerHTML = '<div class="empty-state compact"><span class="empty-icon">◷</span><h2>Nenhuma visita nesta página</h2></div>';
-            return;
-        }
-        lista.innerHTML = visitas.map((visita) => `
-      <article class="visit-card">
-        <p class="visit-date">${esc(rotuloData(visita.scheduledAt))}</p>
-        <h3>${esc(visita.clientName)}</h3>
-        <p>${esc(visita.description)}</p>
-        <p><strong>Materiais</strong><span>${esc(visita.materials || 'Não informado')}</span></p>
-        <p><strong>Técnicos</strong><span>${esc(visita.technicians || 'Não informado')}</span></p>
-        <div class="actions">
-          <button type="button" class="text-button editar-visita" data-id="${esc(visita.id)}">Editar</button>
-          <form action="/calendario/${esc(visita.id)}/excluir" method="post" data-confirm="Excluir esta visita?">
-            <input type="hidden" name="_csrf" value="${esc(csrfToken)}">
-            <button class="text-button danger" type="submit">Excluir</button>
-          </form>
-        </div>
-      </article>
-    `).join('');
-    }
-    function mudarMes(value) {
-        const url = new URL(window.location.href);
-        url.pathname = '/calendario';
-        url.searchParams.set('mes', value);
-        url.searchParams.delete('apos');
-        window.location.assign(url);
-    }
-    const mesVizinho = (offset) => iso(new Date(year, month - 1 + offset, 1)).slice(0, 7);
-    document.getElementById('hoje-button').addEventListener('click', () => mudarMes(payload.currentMonth));
-    document.getElementById('prev-month').addEventListener('click', () => mudarMes(mesVizinho(-1)));
-    document.getElementById('next-month').addEventListener('click', () => mudarMes(mesVizinho(1)));
 
-    let clientSearch;
-    let searchTimer;
-    campoCliente.addEventListener('input', () => {
-        clearTimeout(searchTimer);
-        clientSearch?.abort();
-        const query = campoCliente.value.trim();
-        const matches = [...opcoesClientes.options].filter(option => option.value === query);
-        clienteId.value = matches.length === 1 ? matches[0].dataset.clientId : '';
-        if (clienteId.value || query.length < 2)
-            return;
-        searchTimer = setTimeout(async () => {
-            const request = new AbortController();
-            clientSearch = request;
+    const rows = form.querySelector('[data-visit-materials]');
+    const template = form.querySelector('[data-visit-material-template]');
+    const add = form.querySelector('[data-visit-material-add]');
+    const address = form.elements.address;
+    const clients = form.elements.clientId;
+    const lookups = new WeakMap();
+    let lastAddress = clients.selectedOptions[0]?.dataset.address || '';
+
+    function updateMaterialLimit() {
+        add.disabled = rows.children.length >= 25;
+    }
+
+    function stopLookup(input) {
+        const lookup = lookups.get(input);
+        if (lookup) {
+            clearTimeout(lookup.timer);
+            lookup.request.abort();
+            lookups.delete(input);
+        }
+    }
+
+    function updateOptions(select, options) {
+        const selected = [...select.selectedOptions].filter(option => option.value);
+        const initial = select.multiple ? [] : [select.options[0]];
+        const byId = new Map(selected.map(option => [option.value, option]));
+        for (const entry of options) {
+            if (byId.has(entry.id))
+                continue;
+            const title = entry.label || (entry.unit ? `${entry.name} (${entry.unit})` : entry.name);
+            const option = new Option(title, entry.id);
+            if (typeof entry.address === 'string')
+                option.dataset.address = entry.address;
+            byId.set(entry.id, option);
+        }
+        select.replaceChildren(...initial, ...byId.values());
+        for (const option of selected)
+            option.selected = true;
+    }
+
+    function lookupOptions(input) {
+        const group = input.closest('[data-visit-lookup-group]');
+        const select = group.querySelector('select');
+        const status = group.querySelector('[role=status]');
+        stopLookup(input);
+        const request = new AbortController();
+        const timer = setTimeout(async () => {
             try {
-                const response = await fetch('/calendario/clientes?' + new URLSearchParams({ busca: query }), { signal: request.signal });
-                if (!response.ok || campoCliente.value.trim() !== query)
+                const params = new URLSearchParams({ busca: input.value.trim() });
+                const response = await fetch(`${input.dataset.visitLookup}?${params}`, { signal: request.signal });
+                if (!response.ok)
+                    throw new Error('Consulta indisponível.');
+                const result = await response.json();
+                const options = result.options || result.clients;
+                if (request.signal.aborted)
                     return;
-                const { clients } = await response.json();
-                if (campoCliente.value.trim() !== query)
-                    return;
-                opcoesClientes.replaceChildren(...clients.map(client => {
-                    const option = document.createElement('option');
-                    option.value = client.label;
-                    option.label = client.cnpj || client.label;
-                    option.dataset.clientId = client.id;
-                    return option;
-                }));
+                updateOptions(select, options);
+                status.textContent = options.length ? '' : 'Nenhum resultado para a busca.';
             } catch {
-                // O servidor também valida a escolha ao salvar.
+                if (!request.signal.aborted)
+                    status.textContent = 'Não foi possível consultar os registros. Tente novamente.';
+            } finally {
+                if (lookups.get(input)?.request === request)
+                    lookups.delete(input);
             }
-        }, 200);
+        }, 250);
+        lookups.set(input, { timer, request });
+    }
+
+    form.addEventListener('input', event => {
+        if (event.target.matches('[data-visit-lookup]'))
+            lookupOptions(event.target);
     });
-    grid.addEventListener('click', (event) => {
-        const botao = event.target.closest('button.agendar-dia');
-        if (!botao)
+
+    clients.addEventListener('change', () => {
+        const current = clients.selectedOptions[0]?.dataset.address || '';
+        if (!address.value.trim() || address.value === lastAddress)
+            address.value = current;
+        lastAddress = current;
+    });
+
+    add.addEventListener('click', () => {
+        if (rows.children.length >= 25)
             return;
-        abrirModal(new Date(year, month - 1, Number(botao.dataset.day)));
+        const material = template.content.firstElementChild.cloneNode(true);
+        rows.append(material);
+        material.querySelector('[data-visit-lookup]').focus();
+        updateMaterialLimit();
     });
-    lista.addEventListener('click', (event) => {
-        const botao = event.target.closest('button.editar-visita');
-        if (!botao)
+
+    rows.addEventListener('click', event => {
+        if (!event.target.closest('[data-visit-material-remove]'))
             return;
-        const visita = visitas.find((item) => item.id === botao.dataset.id);
-        if (visita)
-            abrirModal(parseIso(visita.scheduledAt), visita);
+        const row = event.target.closest('[data-visit-material-row]');
+        stopLookup(row.querySelector('[data-visit-lookup]'));
+        row.remove();
+        updateMaterialLimit();
+        add.focus();
     });
-    document.getElementById('fechar-modal').addEventListener('click', fecharModal);
-    modal.addEventListener('click', (event) => {
-        if (event.target === modal)
-            fecharModal();
-    });
-    document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && !modal.hidden)
-            fecharModal();
-    });
-    if (!payload.undated)
-        renderMonth();
-    renderVisits();
+
+    updateMaterialLimit();
 });

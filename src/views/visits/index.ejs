@@ -1,0 +1,47 @@
+<main id="main-content" class="shell inner-page">
+  <div class="page-title-row">
+    <div>
+      <h1>Visitas técnicas</h1>
+      <p class="muted">Consulte endereços, responsáveis, deslocamentos e materiais dos atendimentos.</p>
+    </div>
+    <div class="action-group">
+      <a class="button button-ghost" href="/calendario">Ver calendário</a>
+      <a class="button" href="/calendario/nova?retorno=visitas">Nova visita</a>
+    </div>
+  </div>
+
+  <form class="panel filter-panel" action="/visitas" method="get">
+    <div class="form-grid">
+      <label>Nome do cliente<input name="cliente" type="search" value="<%= search %>" maxlength="160"></label>
+      <label>Situação
+        <select name="situacao">
+          <option value="">Todas as situações</option>
+          <% Object.entries(statuses).forEach(([key, label]) => { %>
+          <option value="<%= key %>" <%= key === status ? 'selected' : '' %>><%= label %></option>
+          <% }) %>
+        </select>
+      </label>
+    </div>
+    <div class="form-actions">
+      <% if (search || status) { %><a class="button button-ghost" href="/visitas">Limpar filtros</a><% } %>
+      <button class="button" type="submit">Filtrar</button>
+    </div>
+  </form>
+
+  <section class="panel visits-panel" aria-labelledby="visit-results">
+    <div class="panel-head"><h2 id="visit-results">Atendimentos</h2></div>
+    <% if (visits.length) { %>
+    <div class="visit-grid">
+      <% visits.forEach(visit => { %><%- include('card', { visit, operational: true }) %><% }) %>
+    </div>
+    <% } else { %>
+    <div class="empty-state compact"><p>Nenhuma visita encontrada para este filtro.</p></div>
+    <% } %>
+    <%- include('../partials/pagination', {
+        page, path: '/visitas', params: { ...(search ? { cliente: search } : {}), ...(status ? { situacao: status } : {}) }
+    }) %>
+    <% if (visits.some(visit => visit.tripDisplay.roundTripKm)) { %>
+    <p class="storage-note"><a class="travel-attribution" href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a></p>
+    <% } %>
+  </section>
+</main>

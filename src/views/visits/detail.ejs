@@ -1,0 +1,84 @@
+<main id="main-content" class="shell inner-page">
+  <div class="page-title-row">
+    <div>
+      <a class="back-link" href="/visitas">Voltar para visitas</a>
+      <h1><%= visit.description || 'Visita técnica' %></h1>
+      <p class="muted"><%= visit.clientName || 'Cliente a vincular' %> · <%= visit.moment %></p>
+    </div>
+    <div class="action-group">
+      <a class="button button-ghost" href="<%= agendaUrl %>">Ver no calendário</a>
+      <% if (!visit.billingFinalized) { %><a class="button" href="/calendario/<%= visit.id %>/editar?retorno=visitas">Editar visita</a><% } %>
+      <% if (user.role === 'admin' && visit.status !== 'cancelada') { %><a class="button button-ghost" href="/financeiro/atendimentos/<%= visit.id %>">Financeiro</a><% } %>
+    </div>
+  </div>
+
+  <div class="split-layout visit-detail-layout">
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Atendimento</h2>
+        <span class="visit-state visit-state-<%= visit.status %>"><%= visit.statusLabel %></span>
+      </div>
+      <dl class="travel-distances">
+        <dt>Cliente</dt><dd><%= visit.clientName || 'A vincular' %></dd>
+        <dt>Endereço</dt><dd><%= visit.address || 'A definir' %></dd>
+        <dt>Data e horário</dt><dd><%= visit.moment %></dd>
+        <dt>Responsáveis</dt><dd><%= visit.technicians || 'A definir' %></dd>
+      </dl>
+      <% if (visit.billingFinalized) { %><p class="muted">Lançamento financeiro registrado.</p><% } %>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><h2>Deslocamento</h2></div>
+      <% if (tripDisplay.roundTripKm) { %>
+      <dl class="travel-distances">
+        <dt>Distância de ida</dt><dd><%= tripDisplay.outboundKm %></dd>
+        <dt>Distância total</dt><dd><%= tripDisplay.roundTripKm %></dd>
+        <dt>Custo da ida</dt><dd><%= tripDisplay.outboundCost || 'A definir' %></dd>
+        <dt>Custo total</dt><dd><%= tripDisplay.roundTripCost || 'A definir' %></dd>
+      </dl>
+      <p class="storage-note"><a class="travel-attribution" href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a></p>
+      <% } %>
+      <% if (tripDisplay.statusMessage) { %><p class="muted"><%= tripDisplay.statusMessage %></p><% } %>
+    </section>
+  </div>
+
+  <section class="panel visits-panel">
+    <div class="panel-head"><h2>Materiais</h2></div>
+    <% if (visit.materialsUsed.length) { %>
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Materiais da visita">
+      <table>
+        <thead><tr><th scope="col">Material</th><th scope="col">Planejado</th><th scope="col">Utilizado</th><th scope="col">Baixa confirmada</th></tr></thead>
+        <tbody>
+        <% const quantity = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 }); %>
+        <% visit.materialsUsed.forEach(line => { %>
+          <tr>
+            <th scope="row"><%= line.name %></th>
+            <td><%= quantity.format(line.plannedQuantity) %> <%= line.unit %></td>
+            <td><%= quantity.format(line.usedQuantity) %> <%= line.unit %></td>
+            <td><%= quantity.format(line.consumedQuantity) %> <%= line.unit %></td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% } else { %>
+    <p class="muted"><%= visit.materials || 'Nenhum material associado a este atendimento.' %></p>
+    <% } %>
+  </section>
+
+  <% if (!visit.billingFinalized && visit.status !== 'concluida') { %>
+  <div class="form-actions">
+    <% if (visit.status !== 'cancelada') { %>
+    <form method="post" action="/calendario/<%= visit.id %>/cancelar" data-confirm="Cancelar esta visita?">
+      <%- include('../partials/csrf-field') %>
+      <input type="hidden" name="revision" value="<%= visit.revision || '' %>"><input type="hidden" name="retorno" value="visitas">
+      <button class="button button-ghost" type="submit">Cancelar visita</button>
+    </form>
+    <% } %>
+    <form method="post" action="/calendario/<%= visit.id %>/excluir" data-confirm="Excluir este registro de visita?">
+      <%- include('../partials/csrf-field') %>
+      <input type="hidden" name="retorno" value="visitas">
+      <button class="button button-ghost danger" type="submit">Excluir registro</button>
+    </form>
+  </div>
+  <% } %>
+</main>

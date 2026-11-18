@@ -13,10 +13,10 @@ function valid(table) {
 
 const read = (row) => row ? { ...row.data, id: row.id } : null;
 
-async function find(table, id) {
+async function find(table, id, run = query) {
     if (!isUuid(id))
         return null;
-    const { rows } = await query(`SELECT id, data FROM ${valid(table)} WHERE id = $1`, [id]);
+    const { rows } = await run(`SELECT id, data FROM ${valid(table)} WHERE id = $1`, [id]);
     return read(rows[0]);
 }
 
@@ -37,8 +37,8 @@ async function update(table, id, data) {
     return read(rows[0]);
 }
 
-async function save(table, id, data) {
-    const { rows } = await write(`
+async function save(table, id, data, run = write) {
+    const { rows } = await run(`
         INSERT INTO ${valid(table)} (id, data) VALUES ($1, $2::jsonb)
         ON CONFLICT (id) DO UPDATE SET data = (${preservedData(valid(table) + '.data')}) || EXCLUDED.data
         RETURNING id, data
@@ -46,10 +46,10 @@ async function save(table, id, data) {
     return read(rows[0]);
 }
 
-async function remove(table, id) {
+async function remove(table, id, run = write) {
     if (!isUuid(id))
         return false;
-    const { rowCount } = await write(`DELETE FROM ${valid(table)} WHERE id = $1`, [id]);
+    const { rowCount } = await run(`DELETE FROM ${valid(table)} WHERE id = $1`, [id]);
     return rowCount > 0;
 }
 

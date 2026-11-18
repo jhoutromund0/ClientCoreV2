@@ -1,10 +1,10 @@
 <main id="main-content" class="shell inner-page form-page">
   <h1>Configurações</h1>
   <%- include('nav', { section: 'travel' }) %>
-  <p class="muted">A tarifa é multiplicada pela distância da rota para estimar o gasto de gasolina. Ao salvar alterações, os deslocamentos de todos os clientes são atualizados em segundo plano.</p>
+  <p class="muted">O custo de deslocamento considera a distância de ida e volta e a tarifa por quilômetro. Alterações atualizam as estimativas de clientes e visitas em segundo plano.</p>
 
   <% if (!locationsConfigured) { %>
-  <p class="muted" role="status">O cálculo de deslocamentos aguarda a configuração dos serviços de localização e rotas no servidor.</p>
+  <p class="muted" role="status">O cálculo de deslocamentos está indisponível no momento.</p>
   <% } %>
 
   <% if (errors.length) { %>

@@ -1,5 +1,6 @@
 const { pool } = require('../config/database');
 const Client = require('../models/Client');
+const VisitTravel = require('../models/VisitTravel');
 const TransportSettings = require('../models/TransportSettings');
 const location = require('./locationService');
 
@@ -12,7 +13,7 @@ const statuses = {
     temporarily_unavailable: 'Serviço de rotas indisponível. O cálculo será tentado novamente.'
 };
 
-function describe(client, settings) {
+function describe(client, settings, addressError = statuses.address_not_found) {
     const address = client.address;
     if (typeof address !== 'string' || !address.trim())
         return { statusMessage: 'Informe o endereço para calcular o deslocamento.' };
@@ -22,11 +23,11 @@ function describe(client, settings) {
         return {
             statusMessage: location.isConfigured()
                 ? 'Cálculo de deslocamento pendente.'
-                : 'Aguardando configuração do serviço de rotas.'
+                : 'Cálculo de deslocamento indisponível no momento.'
         };
     }
     if (travel.status !== 'ready')
-        return { statusMessage: statuses[travel.status] || 'Cálculo de deslocamento pendente.' };
+        return { statusMessage: travel.status === 'address_not_found' ? addressError : (statuses[travel.status] || 'Cálculo de deslocamento pendente.') };
 
     return {
         statusMessage: travel.outboundCostCents == null ? 'Tarifa por km pendente.' : '',
@@ -51,25 +52,37 @@ function priceRoute(travel, distances, rate) {
     };
 }
 
-async function processBatch() {
-    const settings = await TransportSettings.get();
-    const cached = await Client.pendingTravel(settings.revision, 25, settings.originAddress);
-    const clients = cached.length || !location.isConfigured() ? cached : await Client.pendingTravel(settings.revision);
+async function processBatch(run) {
+    const settings = await TransportSettings.get(run);
+    const jobs = [];
+    async function collect(cachedOrigin, limit) {
+        for (const store of [Client, VisitTravel]) {
+            for (const record of await store.pendingTravel(settings.revision, limit, cachedOrigin, run))
+                jobs.push({ store, record });
+        }
+    }
+    await collect(settings.originAddress, 25);
+    if (!jobs.length && location.isConfigured())
+        await collect(null, 5);
+    const routes = new Map();
     let origin;
-    for (const client of clients) {
-        const address = client.address;
-        const previous = client.travel?.address === address ? client.travel : null;
+    for (const { store, record } of jobs) {
+        const { address } = record;
+        const previous = [record.travel, record.clientTravel].find(result => result?.address === address);
+        const reusable = [routes.get(address), record.travel, record.clientTravel].find(result =>
+            result?.address === address && result.originAddress === settings.originAddress && result.status === 'ready' &&
+            Number.isFinite(result.outboundMeters) && Number.isFinite(result.returnMeters));
         const travel = {
             revision: settings.revision,
             address,
             originAddress: settings.originAddress,
-            destination: previous?.destination ?? null
+            destination: reusable?.destination ?? previous?.destination ?? null
         };
 
         let result;
         try {
-            if (previous?.originAddress === settings.originAddress && previous.status === 'ready') {
-                result = priceRoute(travel, previous, settings.rateCentsPerKm);
+            if (reusable) {
+                result = priceRoute(travel, reusable, settings.rateCentsPerKm);
             } else {
                 if (origin === undefined)
                     origin = await location.geocode(settings.originAddress);
@@ -90,16 +103,17 @@ async function processBatch() {
             if (!(error instanceof location.LocationError))
                 throw error;
             const delay = Math.min(2147483647, Math.max(60, error.retryAfter || 0) * 1000);
-            await Client.saveTravel(client.id, address, {
+            await store.saveTravel(record.id, address, {
                 ...travel, status: 'temporarily_unavailable', retryAfter: Date.now() + delay
-            });
+            }, run);
             return delay;
         }
 
-        if (!await Client.saveTravel(client.id, address, result))
-            break;
+        if (result.status === 'ready')
+            routes.set(address, result);
+        await store.saveTravel(record.id, address, result, run);
     }
-    return clients.length ? 1000 : 5000;
+    return jobs.length ? 1000 : 5000;
 }
 
 async function refreshPendingTravel() {
@@ -111,7 +125,7 @@ async function refreshPendingTravel() {
     try {
         const { rows } = await connection.query('SELECT pg_try_advisory_lock(hashtext($1)) AS locked', [lockKey]);
         locked = rows[0].locked;
-        return locked ? await processBatch() : 5000;
+        return locked ? await processBatch(connection.query.bind(connection)) : 5000;
     } finally {
         if (locked) {
             try {
@@ -133,7 +147,7 @@ function start() {
         try {
             delay = await refreshPendingTravel();
         } catch (error) {
-            console.error('Não foi possível atualizar as rotas de clientes.', error.code || error.name);
+            console.error('Não foi possível atualizar as rotas dos atendimentos e clientes.', error.code || error.name);
         } finally {
             if (!stopped)
                 timer = setTimeout(run, delay).unref();

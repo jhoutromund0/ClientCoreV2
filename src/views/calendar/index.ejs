@@ -1,104 +1,83 @@
 <main id="main-content" class="shell inner-page">
   <div class="page-title-row">
     <div>
-      <span class="eyebrow">AGENDA</span>
       <h1>Calendário de visitas</h1>
-      <p class="muted">Veja o mês atual e agende visitas técnicas para os clientes. Clique no + de um dia para marcar o serviço.</p>
+      <p class="muted">Acompanhe os atendimentos e selecione um dia para agendar.</p>
     </div>
-    <button class="button" id="hoje-button" type="button">Ir para hoje</button>
+    <div class="action-group">
+      <a class="button button-ghost" href="<%= todayUrl %>">Ir para hoje</a>
+      <a class="button" href="/calendario/nova">Nova visita</a>
+    </div>
   </div>
 
   <div class="split-layout calendar-layout">
     <aside class="stack">
-      <div class="stat-card" <%= undated ? 'hidden' : '' %>><span>Visitas este mês</span><strong id="total-visitas-mes">0</strong><small>No mês exibido</small></div>
-      <form class="panel filter-panel" action="/calendario" method="get">
+      <% if (!undated) { %>
+      <div class="stat-card"><span>Visitas no mês exibido</span><strong><%= total %></strong></div>
+      <% } %>
+      <form class="panel filter-panel stack" action="/calendario" method="get">
         <input type="hidden" name="mes" value="<%= month %>">
         <h2>Filtrar por cliente</h2>
         <label>Nome do cliente
           <input name="cliente" type="search" placeholder="Digite o nome do cliente" value="<%= search %>" maxlength="160">
         </label>
-        <button class="button button-ghost" type="submit">Filtrar</button>
-        <% if (search) { %><a class="text-button" href="/calendario?mes=<%= month %>">Limpar filtro</a><% } %>
+        <div class="action-group">
+          <button class="button button-ghost" type="submit">Filtrar</button>
+          <% if (search) { %><a class="text-button" href="/calendario?mes=<%= month %>">Limpar filtro</a><% } %>
+        </div>
       </form>
-      <% if (hasUndated && !undated) { %><a class="text-button" href="/calendario?mes=sem-data">Visitas com data inválida</a><% } %>
+      <% if (hasUndated && !undated) { %><a class="text-button" href="/calendario?mes=sem-data">Visitas com data a corrigir</a><% } %>
     </aside>
 
-    <section class="panel" <%= undated ? 'hidden' : '' %>>
+    <% if (!undated) { %>
+    <section class="panel">
       <div class="panel-head">
-        <div>
-          <h2>Calendário</h2>
-          <p id="calendario-status" class="muted">Clique no + para agendar uma visita em qualquer dia.</p>
-        </div>
-        <div class="month-nav">
-          <button id="prev-month" type="button" aria-label="Mês anterior">‹</button>
-          <p id="mes-ano"></p>
-          <button id="next-month" type="button" aria-label="Próximo mês">›</button>
-        </div>
+        <h2>Agenda mensal</h2>
+        <nav class="month-nav" aria-label="Navegar pelos meses">
+          <% if (previousUrl) { %><a class="month-step" href="<%= previousUrl %>" aria-label="Mês anterior">‹</a><% } %>
+          <p><%= monthLabel %></p>
+          <% if (nextUrl) { %><a class="month-step" href="<%= nextUrl %>" aria-label="Próximo mês">›</a><% } %>
+        </nav>
       </div>
       <div class="weekday-row" aria-hidden="true"><span>Dom</span><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span></div>
-      <div id="calendario-grid" class="calendar-grid"></div>
+      <div class="calendar-grid">
+        <% for (const day of days) { %>
+          <% if (!day) { %>
+          <div class="day-cell blank" aria-hidden="true"></div>
+          <% } else { %>
+          <div class="day-cell <%= day.isToday ? 'today' : '' %>">
+            <div class="day-top">
+              <time datetime="<%= day.date %>"><%= day.day %></time>
+              <a class="agendar-dia" href="/calendario/nova?data=<%= day.date %>" aria-label="Agendar visita no dia <%= day.day %>">+</a>
+            </div>
+            <% if (day.count) { %>
+            <div class="day-visits">
+              <span class="visit-count"><%= day.count %> <%= day.count === 1 ? 'visita' : 'visitas' %></span>
+              <% for (const visit of day.preview) { %>
+              <div class="day-chip"><strong><%= visit.clientName %></strong><span><%= visit.description %></span></div>
+              <% } %>
+            </div>
+            <% } %>
+          </div>
+          <% } %>
+        <% } %>
+      </div>
     </section>
+    <% } %>
   </div>
 
   <section class="panel visits-panel">
     <div class="panel-head">
-      <div>
-        <h2><%= undated ? 'Visitas com data inválida' : 'Visitas do mês' %></h2>
-        <p class="muted">Serviço, materiais e técnicos de cada atendimento.</p>
-      </div>
+      <h2><%= undated ? 'Visitas com data a corrigir' : 'Visitas do mês' %></h2>
+      <a class="text-button" href="/visitas">Consultar todas as visitas</a>
     </div>
-    <div id="visitas-do-dia" class="visit-grid"></div>
+    <% if (visits.length) { %>
+    <div class="visit-grid">
+      <% visits.forEach(visit => { %><%- include('../visits/card', { visit, operational: false }) %><% }) %>
+    </div>
+    <% } else { %>
+    <div class="empty-state compact"><p>Nenhuma visita encontrada para este filtro.</p></div>
+    <% } %>
     <%- include('../partials/pagination', { page, path: '/calendario', params: search ? { mes: month, cliente: search } : { mes: month } }) %>
   </section>
-
-  <p class="storage-note">ⓘ Dados armazenados no PostgreSQL.</p>
 </main>
-
-<div id="modal-agendar" class="modal" <%= visitDraft ? '' : 'hidden' %>>
-  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-    <div class="panel-head">
-      <div>
-        <h2 id="modal-title"><%= visitDraft && visitDraft.id ? 'Editar visita' : 'Agendar visita' %></h2>
-        <p id="modal-data" class="muted"><%= visitDraft && visitDraft.id ? 'Atualize os dados da visita.' : 'Escolha o cliente e o serviço do dia.' %></p>
-      </div>
-      <button id="fechar-modal" class="button button-ghost" type="button">Fechar</button>
-    </div>
-    <% if (errors && errors.length) { %>
-      <div class="validation-errors" role="alert"><strong>Revise os campos:</strong><ul><% errors.forEach(error => { %><li><%= error.msg %></li><% }) %></ul></div>
-    <% } %>
-    <form id="form-visita" class="panel-form plain" method="post" action="<%= visitDraft && visitDraft.id ? '/calendario/' + visitDraft.id : '/calendario' %>">
-      <%- include('../partials/csrf-field') %>
-      <div class="form-grid one-col">
-        <label>Data
-          <input id="visita-data" name="scheduledAt" type="date" value="<%= typeof visitDraft?.scheduledAt === 'string' ? visitDraft.scheduledAt.slice(0, 10) : '' %>" required>
-        </label>
-        <label>Cliente
-          <input id="visita-cliente" name="clientName" list="clientes-list" value="<%= visitDraft ? visitDraft.clientName || '' : '' %>" placeholder="Busque um cliente cadastrado" maxlength="340" required autocomplete="off">
-        </label>
-        <input id="visita-cliente-id" type="hidden" name="clientId" value="<%= visitDraft ? visitDraft.clientId || '' : '' %>">
-        <datalist id="clientes-list">
-          <% clients.forEach(client => { %><option value="<%= client.label %>" data-client-id="<%= client.id %>" label="<%= client.cnpj || client.label %>"></option><% }) %>
-        </datalist>
-        <label>O que será realizado
-          <select id="visita-tipo" name="description" required>
-            <option value="">Selecione o serviço</option>
-            <% services.forEach(service => { %>
-              <option value="<%= service %>" <%= visitDraft && visitDraft.description === service ? 'selected' : '' %>><%= service %></option>
-            <% }) %>
-          </select>
-        </label>
-        <label>Materiais necessários
-          <textarea id="visita-materiais" name="materials" maxlength="2000" placeholder="Cabos, conectores, equipamentos..."><%= visitDraft ? visitDraft.materials || '' : '' %></textarea>
-        </label>
-        <label>Técnico(s)
-          <input id="visita-tecnicos" name="technicians" value="<%= visitDraft ? visitDraft.technicians || '' : '' %>" maxlength="240" placeholder="Nome do(s) técnico(s)">
-        </label>
-      </div>
-      <div class="form-actions">
-        <button class="button" type="submit"><%= visitDraft && visitDraft.id ? 'Salvar alterações' : 'Salvar visita' %> →</button>
-      </div>
-    </form>
-  </div>
-</div>
-<script id="calendar-data" type="application/json"><%- calendarJson %></script>
-<script src="/js/calendar.js" defer></script>

@@ -142,8 +142,20 @@ exports.removeUser = async (req, res) => {
     const id = req.params.id;
     if (!isUuid(id) || id.toLowerCase() === req.user.id)
         return renderUsers(req, res, { error: 'Selecione outra conta para excluir.', status: 422 });
-    if (!await User.remove(id, result.account))
-        return renderUsers(req, res, { error: 'A conta não está disponível.', status: 404 });
+    try {
+    try {
+        if (!await User.remove(id, result.account))
+            return renderUsers(req, res, { error: 'A conta não está disponível.', status: 404 });
+    } catch (error) {
+        if (!['23503', '23001'].includes(error.code))
+            throw error;
+        return renderUsers(req, res, { error: 'Esta conta está vinculada a visitas. Desative-a para preservar o histórico.', status: 409 });
+    }
+    } catch (error) {
+        if (error.code !== '23503' && error.code !== '23001')
+            throw error;
+        return renderUsers(req, res, { error: 'Esta conta está vinculada a atendimentos. Desative-a para preservar o histórico.', status: 409 });
+    }
     await req.setFlash({ type: 'success', message: 'Conta excluída.' });
     return res.redirect(303, usersPath);
 };

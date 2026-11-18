@@ -1,0 +1,20 @@
+<fieldset class="panel visit-material stack" data-visit-material-row>
+  <legend>Material da visita</legend>
+  <div class="stack" data-visit-lookup-group>
+    <label>Buscar material<input type="search" maxlength="160" autocomplete="off" data-visit-lookup="/calendario/materiais"></label>
+    <label>Material
+      <select name="materialId" required>
+        <option value="">Selecione um material</option>
+        <% materials.forEach(material => { %>
+        <option value="<%= material.id %>" <%= material.id === line.materialId ? 'selected' : '' %>><%= material.name %> (<%= material.unit %>)</option>
+        <% }) %>
+      </select>
+    </label>
+    <small class="form-hint muted" role="status"></small>
+  </div>
+  <div class="form-grid">
+    <label>Quantidade planejada<input name="plannedQuantity" value="<%= line.plannedQuantity %>" maxlength="11" inputmode="decimal"></label>
+    <label>Quantidade utilizada<input name="usedQuantity" value="<%= line.usedQuantity %>" maxlength="11" inputmode="decimal"></label>
+  </div>
+  <div class="action-group"><button class="text-button danger" type="button" data-visit-material-remove>Remover material</button></div>
+</fieldset>

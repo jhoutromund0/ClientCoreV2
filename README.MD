@@ -82,9 +82,37 @@ Administradores confirmam a própria senha para gerenciar contas. A tela de usu�
 
 A sessão vence após 30 minutos de inatividade ou 12 horas desde o login, com até cinco sessões por conta. Clique no nome da conta no cabeçalho para consultar e encerrar sessões. A alteração do perfil ou da senha revoga os acessos anteriores conforme a operação.
 
-## Deslocamento de clientes
+## Fluxo de atendimento
 
-Em **Configurações**, o administrador pode alterar o endereço de partida da empresa e informar a tarifa de gasolina em reais por quilômetro. O sistema calcula a rota de carro para cada cliente com endereço, registra a distância da ida e o total de ida e volta, e multiplica cada distância pela tarifa. Alterações na configuração são aplicadas aos clientes existentes em segundo plano.
+1. Em **Configurações → Serviços**, cadastre os serviços oferecidos e seus preços padrão. Desative os serviços que deixaram de ser oferecidos. Os atendimentos já agendados conservam os preços registrados.
+2. No **Calendário**, selecione um cliente, um serviço, os responsáveis, a data, o horário e os materiais previstos. O endereço do cliente é sugerido e pode ser alterado para esse atendimento.
+3. Abra **Visitas** para acompanhar os dados operacionais e o deslocamento. Ao encerrar a execução, confirme as quantidades efetivamente utilizadas. O estoque muda pelo consumo confirmado e uma correção posterior movimenta somente a diferença.
+4. No **Financeiro**, o administrador revisa o valor do serviço, os materiais, o custo de deslocamento, as despesas extras e o valor recebido. O deslocamento cobrado do cliente tem um campo próprio. As previsões ficam disponíveis antes da conclusão. O lançamento concluído conserva os valores e custos registrados.
+
+O financeiro mantém um lançamento por visita. Para corrigir os dados de origem de um atendimento com lançamento concluído, exclua esse lançamento, edite o atendimento e registre os valores atualizados. Visitas concluídas permanecem no histórico de consumo. Visitas agendadas podem ser canceladas.
+
+## Atualização do PostgreSQL e do Render
+
+1. Faça um backup do PostgreSQL. Valide a nova versão primeiro em homologação, com um banco separado.
+2. Instale as dependências com `npm ci` e configure `DATABASE_URL` para o banco a atualizar.
+3. Execute `npm run db:migrate` antes de iniciar a nova versão. O comando aplica os arquivos SQL pendentes em ordem, cada um em sua própria transação. Esta atualização adiciona `004_service_catalog.sql`, `005_visit_operations.sql`, `006_visit_resources.sql` e `007_attendance_finance.sql`. Os registros existentes são preservados e podem ser vinculados aos novos cadastros ao editar uma visita antiga.
+4. No Render, use `npm start` para iniciar a aplicação. Em um plano com comando de pré-deploy, ele pode executar `npm run db:migrate`. Quando o plano não oferece esse comando, execute a migração em uma etapa autorizada antes de iniciar o serviço atualizado. [Etapas de deploy no Render](https://render.com/docs/deploys#pre-deploy-command)
+
+| Variável existente | Configuração |
+| --- | --- |
+| `DATABASE_URL` | Conexão com o PostgreSQL do ambiente. |
+| `SESSION_SECRET` | Chave de pelo menos 32 caracteres, compartilhada pelas instâncias. |
+| `NODE_ENV`, `APP_URL`, `PORT` | Use `production` e a origem HTTPS pública no Render. A aplicação usa a porta fornecida pelo ambiente. |
+| `TRUST_PROXY_HOPS` | Quantidade de proxies confiáveis entre o cliente e o servidor. |
+| `DB_SSL`, `DB_SSL_REJECT_UNAUTHORIZED` | Opções TLS da conexão PostgreSQL de acordo com o ambiente. |
+| `NOMINATIM_BASE_URL`, `OSRM_BASE_URL`, `OSM_USER_AGENT` | Endereços dos serviços contratados ou próprios e identificação da aplicação. |
+| `CNPJA_BASE_URL`, `CNPJA_TIMEOUT_MS`, `PASSWORD_BREACH_CHECK` | Configurações opcionais mantidas das versões anteriores. |
+
+Para criar o primeiro administrador em um banco novo, execute `node script/create-admin.js`. Para verificar o código sem conexão com o banco, use `npm run check`.
+
+## Deslocamento de clientes e visitas
+
+Em **Configurações**, o administrador define o endereço de partida e a tarifa em reais por quilômetro. O sistema calcula a rota de carro para o endereço efetivo da visita, registra as distâncias de ida e de ida e volta e multiplica a distância total pela tarifa. Alterações no local ou nas configurações atualizam as estimativas em segundo plano. Lançamentos já concluídos mantêm o custo registrado.
 
 1. Execute `npm run db:migrate` com `DATABASE_URL` configurada para aplicar as migrações, incluindo a tabela de configuração de deslocamentos.
 2. Defina `NOMINATIM_BASE_URL` e `OSRM_BASE_URL` no ambiente do servidor com as URLs de instâncias próprias ou contratadas. O Nominatim deve oferecer `/search`. O OSRM deve oferecer `/table/v1/driving` e, se a matriz não incluir distâncias, `/route/v1/driving`. `OSM_USER_AGENT` permite identificar a instalação nos pedidos aos serviços.
@@ -123,7 +151,7 @@ O processamento de carteiras de clientes usa instâncias adequadas a consultas r
 
 ### Infraestrutura e Desenvolvimento
 
-- **Render:** plataforma prevista para hospedagem da aplicação e do banco de dados.
+- **Render:** hospedagem da aplicação e do banco de dados.
 - **Git:** versionamento do código.
 - **GitHub:** armazenamento e colaboração.
 - **npm:** gerenciamento de dependências.
@@ -156,8 +184,6 @@ ClientCoreV2/
 │   └── server.js           # Inicialização do servidor
 ├── sql/                    # Scripts do PostgreSQL
 ├── script/                 # Scripts auxiliares
-├── test/                   # Testes automatizados
-├── .env.example            # Exemplo de variáveis de ambiente
 ├── .gitignore
 ├── package.json
 ├── package-lock.json

@@ -8,8 +8,8 @@ const defaults = Object.freeze({
 });
 const columns = 'origin_address AS "originAddress", rate_cents_per_km AS "rateCentsPerKm", revision';
 
-async function get() {
-    const { rows } = await query(`SELECT ${columns} FROM transport_settings WHERE id`);
+async function get(run = query) {
+    const { rows } = await run(`SELECT ${columns} FROM transport_settings WHERE id`);
     return rows[0] ?? defaults;
 }
 

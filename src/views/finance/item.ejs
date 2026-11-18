@@ -8,7 +8,7 @@
       <select data-catalog>
         <option value="">Selecione um material</option>
         <% materials.forEach((material) => { %>
-          <option value="<%= material.id %>" data-name="<%= material.name %>" data-unit="<%= material.unit %>" data-cost="<%= material.unitValue.toFixed(2) %>"><%= material.name %></option>
+          <option value="<%= material.id %>" data-name="<%= material.name %>" data-unit="<%= material.unit %>" data-cost="<%= material.unitValue.toFixed(2) %>" data-price="<%= material.unitPrice.toFixed(2) %>"><%= material.name %></option>
         <% }) %>
       </select>
       <span class="sr-only" data-catalog-status role="status"></span>

@@ -17,6 +17,7 @@
   <div class="split-layout">
     <form id="material-form" class="panel-form" method="post" action="<%= materialData && materialData.id ? '/materiais/' + materialData.id : '/materiais' %>" autocomplete="off">
       <%- include('../partials/csrf-field') %>
+      <% if (materialData?.revision) { %><input name="revision" type="hidden" value="<%= materialData.revision %>"><% } %>
       <h2 id="form-title"><%= materialData && materialData.id ? 'Editar material' : 'Adicionar material' %></h2>
       <% if (errors && errors.length) { %>
         <div class="validation-errors" role="alert"><strong>Revise os campos:</strong><ul><% errors.forEach(error => { %><li><%= error.msg %></li><% }) %></ul></div>
@@ -36,7 +37,7 @@
         </label>
         <label>
           <span id="medida-label"><%= materialData && materialData.measureType === 'comprimento' ? 'Comprimento' : 'Quantidade' %></span>
-          <input id="material-medida" name="measure" type="number" min="0.01" step="0.01" value="<%= materialData && materialData.measure !== '' && materialData.measure != null ? materialData.measure : '' %>" placeholder="0" required>
+          <input id="material-medida" name="measure" type="number" min="0" max="1000000" step="any" value="<%= materialData && materialData.measure !== '' && materialData.measure != null ? materialData.measure : '' %>" placeholder="0" required>
         </label>
         <label id="unidade-medida-wrapper" <%= materialData && materialData.measureType === 'comprimento' ? '' : 'hidden' %>>Unidade
           <select id="material-unidade-medida" name="unit">
@@ -44,9 +45,14 @@
             <option value="kg" <%= materialData && materialData.unit === 'kg' ? 'selected' : '' %>>Kg</option>
           </select>
         </label>
-        <label>Valor unitário
-          <input id="material-valor" name="unitValue" type="number" min="0" step="0.01" value="<%= materialData && materialData.unitValue !== '' && materialData.unitValue != null ? materialData.unitValue : '' %>" placeholder="0,00" required>
+        <label>Custo unitário (R$)
+          <input id="material-valor" name="unitValue" type="number" min="0" max="100000000" step="0.01" value="<%= materialData && materialData.unitValue !== '' && materialData.unitValue != null ? materialData.unitValue : '' %>" placeholder="0,00" required>
         </label>
+        <% if (user?.role === 'admin') { %>
+          <label>Preço unitário a cobrar (R$)
+            <input name="unitPrice" type="number" min="0" max="100000000" step="0.01" value="<%= materialData?.unitPrice ?? '' %>" placeholder="0,00">
+          </label>
+        <% } %>
       </div>
       <div class="form-actions">
         <% if (materialData && materialData.id) { %><a class="button button-ghost" id="cancelar-edicao" href="/materiais">Cancelar</a><% } %>
@@ -73,14 +79,14 @@
         <table>
           <caption class="sr-only">Materiais cadastrados, valores e ações disponíveis</caption>
           <thead>
-            <tr><th>Nome</th><th>Tipo</th><th>Medida</th><th>Valor</th><th>Total</th><th>Ações</th></tr>
+            <tr><th>Nome</th><th>Tipo</th><th>Saldo</th><th>Custo unitário</th><th>Custo total</th><th>Ações</th></tr>
           </thead>
           <tbody id="materiais-lista">
             <% materials.forEach(item => { %>
               <tr>
                 <td><strong><%= item.name %></strong></td>
                 <td><%= item.measureType === 'comprimento' ? 'Comprimento' : 'Quantidade' %></td>
-                <td class="measure-cell"><%= Number(item.measure).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %> <%= item.measureType === 'comprimento' ? item.unit : 'un' %></td>
+                <td class="measure-cell"><%= Number(item.measure).toLocaleString('pt-BR', { maximumFractionDigits: 3 }) %> <%= item.measureType === 'comprimento' ? item.unit : 'un' %></td>
                 <td><%= Number(item.unitValue).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) %></td>
                 <td><%= (Number(item.measure) * Number(item.unitValue)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) %></td>
                 <td class="actions">
@@ -105,6 +111,5 @@
       <%- include('../partials/pagination', { page, path: '/materiais', params: search ? { busca: search } : {} }) %>
     </section>
   </div>
-  <p class="storage-note">ⓘ Dados armazenados no PostgreSQL.</p>
 </main>
 <script src="/js/materials.js" defer></script>

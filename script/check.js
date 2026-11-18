@@ -1,5 +1,5 @@
 const { spawnSync } = require('node:child_process');
-const { readdirSync, readFileSync } = require('node:fs');
+const { existsSync, readdirSync, readFileSync } = require('node:fs');
 const path = require('node:path');
 const ejs = require('ejs');
 
@@ -19,7 +19,11 @@ let scripts = 0;
 let templates = 0;
 let failed = false;
 
-for (const directory of ['src', 'public', 'script', 'test']) {
+const directories = ['src', 'public', 'script'];
+if (existsSync(path.join(project, 'test')))
+    directories.push('test');
+
+for (const directory of directories) {
     for (const file of filesIn(path.join(project, directory))) {
         const extension = path.extname(file);
         if (['.js', '.cjs', '.mjs'].includes(extension)) {

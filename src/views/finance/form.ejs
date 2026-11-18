@@ -1,5 +1,8 @@
 <main class="shell inner-page" id="main-content">
-  <a class="text-button" href="/financeiro">Voltar ao financeiro</a>
+  <div class="actions module-links">
+    <a class="text-button" href="/financeiro">Voltar ao financeiro</a>
+    <a class="text-button" href="/visitas/<%= visit.id %>">Ver visita</a>
+  </div>
   <h1>Financeiro do atendimento</h1>
   <p class="lead"><%= visit.clientName %> · <%= visit.description %> · <%= visit.scheduledAt.slice(0, 10).split('-').reverse().join('/') %></p>
   <% if (errors.length) { %>
@@ -7,10 +10,24 @@
       <ul><% errors.forEach((error) => { %><li><%= error %></li><% }) %></ul>
     </div>
   <% } %>
-  <form id="finance-form" class="panel-form" method="post" action="/financeiro/atendimentos/<%= visit.id %>" data-max-materials="25">
+  <% if (visit.status === 'cancelada') { %>
+    <p class="muted">Atendimento cancelado.</p>
+    <% if (state.record) { %>
+    <dl class="record-details">
+      <div><dt>Previsão do lançamento</dt><dd><%= formatMoney(state.record.charge) %></dd></div>
+      <div><dt>Despesas previstas</dt><dd><%= formatMoney(state.record.cost) %></dd></div>
+      <div><dt>Recebido</dt><dd><%= formatMoney(state.record.received) %></dd></div>
+    </dl>
+    <% } %>
+  <% } else { %>
+  <% if (!state.finalized) { %>
+    <p class="muted">Os valores ficam como previsão até a conclusão da visita. O recebimento pode ser registrado após a conclusão.</p>
+  <% } %>
+  <form id="finance-form" class="panel-form" method="post" action="/financeiro/atendimentos/<%= visit.id %>" data-max-materials="25"
+        data-stock-cost="<%= state.inventoryTotals.cost %>" data-stock-charge="<%= state.inventoryTotals.charge %>" data-travel-cost="<%= state.travel?.costCents ?? 0 %>">
     <%- include('../partials/csrf-field') %>
     <div class="form-grid">
-      <% if (visit.description === 'Orçamento') { %>
+      <% if (state.isBudget) { %>
         <label>Situação do orçamento
           <select name="status">
             <% Object.entries(statuses).forEach(([key, label]) => { %>
@@ -22,29 +39,67 @@
       <label>Valor do serviço (R$)
         <input name="labor" inputmode="decimal" maxlength="9" value="<%= draft.labor %>" required>
       </label>
+      <label>Deslocamento cobrado (R$)
+        <input name="travelCharge" inputmode="decimal" maxlength="9" value="<%= draft.travelCharge %>" required>
+      </label>
+      <label>Outras despesas do atendimento (R$)
+        <input name="otherCost" inputmode="decimal" maxlength="9" value="<%= draft.otherCost %>" required>
+      </label>
       <label>Valor recebido (R$)
         <input name="received" inputmode="decimal" maxlength="9" value="<%= draft.received %>" required>
       </label>
     </div>
-    <h2>Materiais do atendimento</h2>
-    <p class="muted">Informe o custo e quanto será cobrado do cliente por unidade. A quantidade lançada serve para o cálculo financeiro.</p>
+    <section class="finance-section" aria-labelledby="finance-travel-title">
+      <h2 id="finance-travel-title">Deslocamento</h2>
+      <% if (state.travel) { %>
+      <dl class="record-details">
+        <div><dt>Ida</dt><dd><%= formatKm(state.travel.outboundMeters) %></dd></div>
+        <div><dt>Ida e volta</dt><dd><%= formatKm(state.travel.roundTripMeters) %></dd></div>
+        <div><dt>Tarifa por km</dt><dd><%= state.travel.rateCentsPerKm == null ? 'A definir' : formatMoney(state.travel.rateCentsPerKm) %></dd></div>
+        <div><dt>Custo de deslocamento</dt><dd><%= state.travel.costCents == null ? 'A calcular' : formatMoney(state.travel.costCents) %></dd></div>
+      </dl>
+      <p class="muted form-hint"><a class="travel-attribution" href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a></p>
+      <% } else { %>
+      <p class="muted"><%= state.travelDescription.statusMessage %></p>
+      <% } %>
+    </section>
+    <% const linked = state.finalized ? state.inventory : state.planned; %>
+    <% if (linked.length) { %>
+    <section class="finance-section" aria-labelledby="finance-linked-title">
+      <h2 id="finance-linked-title"><%= state.finalized ? 'Materiais confirmados na visita' : 'Materiais previstos na visita' %></h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Material</th><th>Quantidade</th><th>Custo unitário</th><th>Preço unitário</th></tr></thead>
+          <tbody>
+            <% linked.forEach(item => { %>
+            <tr><td><%= item.name %></td><td><%= (item.quantity / 1000).toLocaleString('pt-BR') %> <%= item.unit %></td><td><%= formatMoney(item.cost) %></td><td><%= formatMoney(item.price) %></td></tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <% if (!state.finalized) { %><p class="muted">Os materiais entram no total após a confirmação de consumo.</p><% } %>
+    </section>
+    <% } %>
+    <h2 class="finance-section">Materiais avulsos</h2>
+    <p class="muted">Itens avulsos afetam este lançamento. Para movimentar estoque, registre o consumo na visita.</p>
     <div id="finance-items" class="stack">
       <% draft.items.forEach((item) => { %>
         <%- include('item', { item }) %>
       <% }) %>
     </div>
-    <button id="finance-add" type="button" class="button button-ghost" hidden>Adicionar material</button>
+    <button id="finance-add" type="button" class="button button-ghost" hidden>Adicionar material avulso</button>
     <p class="muted" id="finance-preview" aria-live="polite"></p>
     <button type="submit" class="button">Salvar lançamento</button>
   </form>
-  <% if (hasRecord) { %>
+  <% } %>
+  <% if (state.record) { %>
     <form method="post" action="/financeiro/atendimentos/<%= visit.id %>/excluir" data-confirm="Excluir o lançamento financeiro deste atendimento?">
       <%- include('../partials/csrf-field') %>
       <button type="submit" class="text-button danger">Excluir lançamento</button>
     </form>
   <% } %>
   <template id="finance-item-template">
-    <%- include('item', { item: { name: '', origin: 'estoque', unit: 'un', quantity: '1', cost: '0.00', price: '0.00' } }) %>
+    <%- include('item', { item: { name: '', origin: 'compra', unit: 'un', quantity: '1', cost: '0.00', price: '0.00' } }) %>
   </template>
 </main>
 <script src="/js/finance.js" defer></script>

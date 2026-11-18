@@ -1,0 +1,17 @@
+<article class="visit-card">
+  <div class="visit-card-heading">
+    <p class="visit-date"><%= visit.moment %></p>
+    <span class="visit-state visit-state-<%= visit.status %>"><%= visit.statusLabel %></span>
+  </div>
+  <h3><a href="/visitas/<%= visit.id %>"><%= visit.clientName || 'Cliente a vincular' %></a></h3>
+  <p><%= visit.description || 'Serviço a vincular' %></p>
+  <p><strong>Responsáveis</strong><span><%= visit.technicians || 'A definir' %></span></p>
+  <p><strong>Endereço</strong><span><%= visit.address || 'A definir' %></span></p>
+  <% if (operational && visit.tripDisplay.roundTripKm) { %>
+  <p><strong>Deslocamento total</strong><span><%= [visit.tripDisplay.roundTripKm, visit.tripDisplay.roundTripCost].filter(Boolean).join(' · ') %></span></p>
+  <% } %>
+  <div class="actions">
+    <a class="text-button" href="/visitas/<%= visit.id %>">Ver detalhes</a>
+    <% if (!visit.billingFinalized) { %><a class="text-button" href="/calendario/<%= visit.id %>/editar?retorno=<%= operational ? 'visitas' : 'calendario' %>">Editar</a><% } %>
+  </div>
+</article>

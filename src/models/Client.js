@@ -50,8 +50,8 @@ module.exports = class Client {
         return rows;
     }
 
-    static async pendingTravel(revision, limit = 25, cachedOrigin = null) {
-        const { rows } = await query(`
+    static async pendingTravel(revision, limit = 25, cachedOrigin = null, run = query) {
+        const { rows } = await run(`
             SELECT data || jsonb_build_object('id', id) AS data FROM clients
             WHERE jsonb_typeof(data->'address') = 'string' AND data->>'address' ~ '[^[:space:]]'
                 AND jsonb_typeof(data->'name') = 'string' AND name_key <> ''
@@ -70,8 +70,8 @@ module.exports = class Client {
         return rows.map(row => row.data);
     }
 
-    static async saveTravel(id, address, travel) {
-        const { rowCount } = await query(`
+    static async saveTravel(id, address, travel, run = query) {
+        const { rowCount } = await run(`
             UPDATE clients
             SET data = jsonb_set(data, '{travel}', $3::jsonb)
             WHERE id = $1 AND data->>'address' = $2 AND jsonb_typeof(data->'name') = 'string'
