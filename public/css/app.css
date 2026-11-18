@@ -1301,7 +1301,7 @@ td .travel-status {
 }
 .day-cell {
   position:relative;
-  min-height:112px;
+  min-height:84px;
   padding:10px;
   border:1px solid #ffffff10;
   border-radius:16px;
@@ -1337,34 +1337,91 @@ td .travel-status {
   background:#ffffff10
 }
 .day-visits {
-  display:grid;
-  gap:6px;
   margin-top:8px
 }
 .visit-count {
-  justify-self:start;
-  padding:2px 7px;
+  display:block;
+  width:max-content;
+  max-width:100%;
+  padding:2px 5px;
+  cursor:pointer;
+  list-style:none;
   border-radius:99px;
   background:#83e29a18;
   color:var(--green);
   font-size:10px;
   font-weight:700
 }
-.day-chip {
-  padding:6px 8px;
-  border-radius:10px;
-  background:#ffffff08;
-  font-size:10px;
-  color:#c5ccc4
+.visit-count::-webkit-details-marker {
+  display:none
 }
-.day-chip strong,.day-chip span {
-  display:block;
-  overflow:hidden;
-  text-overflow:ellipsis;
+.visit-count:focus-visible {
+  outline:2px solid var(--green);
+  outline-offset:2px
+}
+.day-cell:has(.day-visits[open]) {
+  z-index:2
+}
+.day-visit-preview {
+  position:absolute;
+  inset-inline-start:8px;
+  width:min(16rem,calc(100vw - 48px));
+  max-height:12rem;
+  margin:4px 0 0;
+  padding:6px 8px;
+  overflow:auto;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:#171b17;
+  box-shadow:0 8px 22px #0009;
+  list-style:none
+}
+.day-cell:nth-child(7n) .day-visit-preview,
+.day-cell:nth-child(7n - 1) .day-visit-preview,
+.day-cell:nth-child(7n - 2) .day-visit-preview {
+  inset-inline-start:auto;
+  inset-inline-end:8px
+}
+.day-visit-preview li {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:10px;
+  padding:3px 0;
+  font-size:12px;
   white-space:nowrap
 }
-.day-chip strong {
-  color:#fff
+.day-visit-preview li>span:first-child {
+  overflow:hidden;
+  text-overflow:ellipsis
+}
+.day-visit-preview time {
+  color:var(--green);
+  font-variant-numeric:tabular-nums
+}
+@media(max-width:620px) {
+  .calendar-month {
+    padding:12px
+  }
+  .calendar-month .calendar-grid,.calendar-month .weekday-row {
+    gap:4px
+  }
+  .calendar-month .day-cell {
+    min-height:60px;
+    padding:4px;
+    border-radius:9px
+  }
+  .day-top {
+    flex-wrap:wrap;
+    gap:2px;
+    font-size:11px
+  }
+  .agendar-dia {
+    width:18px;
+    height:18px
+  }
+  .visit-count-label {
+    display:none
+  }
 }
 .no-visit {
   position:absolute;
@@ -1450,9 +1507,6 @@ td .travel-status {
   .day-cell {
     min-height:88px;
     padding:8px
-  }
-  .day-chip {
-    display:none
   }
 }
 

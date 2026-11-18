@@ -30,7 +30,7 @@
     </aside>
 
     <% if (!undated) { %>
-    <section class="panel">
+    <section class="panel calendar-month">
       <div class="panel-head">
         <h2>Agenda mensal</h2>
         <nav class="month-nav" aria-label="Navegar pelos meses">
@@ -51,12 +51,19 @@
               <a class="agendar-dia" href="/calendario/nova?data=<%= day.date %>" aria-label="Agendar visita no dia <%= day.day %>">+</a>
             </div>
             <% if (day.count) { %>
-            <div class="day-visits">
-              <span class="visit-count"><%= day.count %> <%= day.count === 1 ? 'visita' : 'visitas' %></span>
-              <% for (const visit of day.preview) { %>
-              <div class="day-chip"><strong><%= visit.clientName %></strong><span><%= visit.description %></span></div>
-              <% } %>
-            </div>
+            <details class="day-visits">
+              <summary class="visit-count" aria-label="<%= day.count %> <%= day.count === 1 ? 'visita' : 'visitas' %> no dia <%= day.day %>">
+                <%= day.count %><span class="visit-count-label"> <%= day.count === 1 ? 'visita' : 'visitas' %></span>
+              </summary>
+              <ul class="day-visit-preview" aria-label="Visitas do dia <%= day.day %>">
+                <% for (const visit of day.preview) { %>
+                <li>
+                  <span title="<%= visit.clientName %>"><%= visit.clientName %></span>
+                  <% if (visit.time) { %><time datetime="<%= visit.time %>"><%= visit.time %></time><% } else { %><span aria-label="Sem horário">—</span><% } %>
+                </li>
+                <% } %>
+              </ul>
+            </details>
             <% } %>
           </div>
           <% } %>
@@ -81,3 +88,4 @@
     <%- include('../partials/pagination', { page, path: '/calendario', params: search ? { mes: month, cliente: search } : { mes: month } }) %>
   </section>
 </main>
+<script src="/js/calendar.js" defer></script>

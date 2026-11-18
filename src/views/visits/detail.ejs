@@ -33,7 +33,7 @@
         <dt>Quilometragem de ida</dt><dd><%= tripDisplay.outboundKm || 'A calcular' %></dd>
         <dt>Ida e volta</dt><dd><%= tripDisplay.roundTripKm || 'A calcular' %></dd>
         <% if (tripDisplay.payeeName) { %><dt>Quem recebe</dt><dd><%= tripDisplay.payeeName %></dd><% } %>
-        <dt>Tarifa por km</dt><dd><%= tripDisplay.rate || 'A definir' %></dd>
+        <dt><%= tripDisplay.rateSource === 'user' ? 'Tarifa individual por km' : 'Tarifa por km' %></dt><dd><%= tripDisplay.rate || 'A definir' %></dd>
         <dt>Valor a pagar</dt><dd><strong><%= tripDisplay.amount || 'A calcular' %></strong></dd>
       </dl>
       <% } %>

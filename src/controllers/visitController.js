@@ -79,7 +79,12 @@ function calendarDays(month, summaries) {
             return null;
         const day = index - firstWeekday + 1;
         const date = `${month}-${String(day).padStart(2, '0')}`;
-        return { day, date, isToday: now === date, ...summaries[date] };
+        const summary = summaries[date];
+        const preview = (summary?.preview || []).map(({ clientName, scheduledAt }) => ({
+            clientName: text(clientName) || 'Empresa a vincular',
+            time: splitDateTime(scheduledAt).scheduledTime
+        }));
+        return { day, date, isToday: now === date, count: preview.length, preview };
     });
 }
 

@@ -1,4 +1,37 @@
 document.addEventListener('DOMContentLoaded', () => {
+    for (const details of document.querySelectorAll('.day-visits')) {
+        const cell = details.closest('.day-cell');
+        const preview = details.querySelector('.day-visit-preview');
+        let openedByPointer = false;
+        details.addEventListener('toggle', () => {
+            if (!details.open)
+                return;
+            preview.style.translate = '';
+            const { left, right } = preview.getBoundingClientRect();
+            const shift = Math.max(8 - left, 0) - Math.max(right - document.documentElement.clientWidth + 8, 0);
+            if (shift)
+                preview.style.translate = `${shift}px`;
+        });
+        cell.addEventListener('pointerenter', event => {
+            if (event.pointerType === 'mouse' && !details.open) {
+                openedByPointer = true;
+                details.open = true;
+            }
+        });
+        cell.addEventListener('pointerleave', event => {
+            if (event.pointerType === 'mouse' && openedByPointer) {
+                details.open = false;
+                openedByPointer = false;
+            }
+        });
+        details.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && details.open) {
+                details.open = false;
+                openedByPointer = false;
+            }
+        });
+    }
+
     const form = document.querySelector('[data-visit-form]');
     if (!form)
         return;

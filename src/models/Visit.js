@@ -253,20 +253,17 @@ async function calendarPage(start, end, search, after, limit = 40) {
             ORDER BY visits.scheduled_day, visits.id LIMIT $6
         `, [...params, sort, id, limit + 1]),
         database.query(`
-            WITH ranked AS (
-                SELECT visits.scheduled_day AS day, visits.data,
-                    count(*) OVER (PARTITION BY visits.scheduled_day) AS count,
-                    row_number() OVER (PARTITION BY visits.scheduled_day ORDER BY visits.data->>'scheduledAt', visits.id) AS position
-                FROM visits WHERE ${monthWhere}
-            )
-            SELECT day, count, data->>'clientName' AS "clientName", data->>'description' AS description
-            FROM ranked WHERE position <= 2 ORDER BY day, position
+            SELECT visits.scheduled_day AS day, visits.data->>'clientName' AS "clientName",
+                visits.data->>'scheduledAt' AS "scheduledAt"
+            FROM visits WHERE ${monthWhere}
+            ORDER BY day, visits.data->>'scheduledAt', visits.id
         `, params)
     ]);
     const days = {};
-    for (const { day, count, clientName, description } of summaryResult.rows) {
-        const summary = days[day] ??= { count: Number(count), preview: [] };
-        summary.preview.push({ clientName, description });
+    for (const { day, clientName, scheduledAt } of summaryResult.rows) {
+        const summary = days[day] ??= { count: 0, preview: [] };
+        summary.count++;
+        summary.preview.push({ clientName, scheduledAt });
     }
     return { ...await formatPage(pageResult.rows, limit), days };
 }

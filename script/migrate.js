@@ -4,8 +4,21 @@ const { readFile, readdir } = require('node:fs/promises');
 const sqlDirectory = path.join(__dirname, '..', 'sql');
 const migrationsDirectory = path.join(sqlDirectory, 'migrations');
 
+async function migrationFiles() {
+    return (await readdir(migrationsDirectory)).filter((name) => /^\d+_.+\.sql$/.test(name)).sort();
+}
+
+async function pendingMigrations(connection) {
+    const files = await migrationFiles();
+    const { rows: [schema] } = await connection.query("SELECT to_regclass('schema_migrations') IS NOT NULL AS initialized");
+    if (!schema.initialized)
+        return files;
+    const { rows } = await connection.query('SELECT filename FROM schema_migrations');
+    const applied = new Set(rows.map(row => row.filename));
+    return files.filter(filename => !applied.has(filename));
+}
+
 async function migrate(pool) {
-    const files = (await readdir(migrationsDirectory)).filter((name) => /^\d+_.+\.sql$/.test(name)).sort();
     const client = await pool.connect();
     try {
         // Uma única conexão mantém o lock durante toda a atualização.
@@ -16,12 +29,8 @@ async function migrate(pool) {
                 filename TEXT PRIMARY KEY,
                 applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             )`);
-            const { rows } = await client.query('SELECT filename FROM schema_migrations');
-            const applied = new Set(rows.map((row) => row.filename));
             const updated = [];
-            for (const filename of files) {
-                if (applied.has(filename))
-                    continue;
+            for (const filename of await pendingMigrations(client)) {
                 await client.query('BEGIN');
                 try {
                     await client.query(await readFile(path.join(migrationsDirectory, filename), 'utf8'));
@@ -60,4 +69,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { migrate };
+module.exports = { migrate, pendingMigrations };

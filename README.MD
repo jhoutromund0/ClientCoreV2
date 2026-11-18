@@ -95,7 +95,7 @@ O financeiro mantém um lançamento por visita. Para corrigir os dados de origem
 
 1. Faça um backup do PostgreSQL. Valide a nova versão primeiro em homologação, com um banco separado.
 2. Instale as dependências com `npm ci` e configure `DATABASE_URL` para o banco a atualizar.
-3. Execute `npm run db:migrate` antes de iniciar a nova versão. O comando aplica os arquivos SQL pendentes em ordem, cada um em sua própria transação. Esta atualização adiciona `004_service_catalog.sql`, `005_visit_operations.sql`, `006_visit_resources.sql` e `007_attendance_finance.sql`. Os registros existentes são preservados e podem ser vinculados aos novos cadastros ao editar uma visita antiga.
+3. Execute `npm run db:migrate` antes de iniciar a nova versão. O comando aplica os arquivos SQL pendentes em ordem, cada um em sua própria transação. A quilometragem usa `008_user_mileage_rate.sql` e `009_visit_mileage.sql`. A inicialização verifica as migrações e lista no log os arquivos pendentes. Os registros existentes podem ser vinculados aos novos cadastros ao editar uma visita antiga.
 4. No Render, use `npm start` para iniciar a aplicação. Em um plano com comando de pré-deploy, ele pode executar `npm run db:migrate`. Quando o plano não oferece esse comando, execute a migração em uma etapa autorizada antes de iniciar o serviço atualizado. [Etapas de deploy no Render](https://render.com/docs/deploys#pre-deploy-command)
 
 | Variável existente | Configuração |

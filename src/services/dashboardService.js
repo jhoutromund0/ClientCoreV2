@@ -1,6 +1,7 @@
 const Visit = require('../models/Visit');
 const { query } = require('../config/database');
 const TransportSettings = require('../models/TransportSettings');
+const visitTravel = require('./visitTravelService');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const localDate = new Intl.DateTimeFormat('en-CA', {
@@ -185,8 +186,8 @@ async function load(requestedPeriod, now = new Date()) {
 
         if (day > dates.today || !technicians.people.size || (visit.hasOperationalStatus && visit.status !== 'concluida'))
             continue;
-        const meters = routeMeters(visit, settings.originAddress) ??
-            (visit.address === client.address ? routeMeters(client, settings.originAddress) : null);
+        const meters = visitTravel.recordedOrCurrent(visit, settings)?.roundTripMeters ??
+            (!visit.billingFinalized && visit.address === client.address ? routeMeters(client, settings.originAddress) : null);
         if (meters === null)
             continue;
         const millimeters = Math.round(meters * 1000);
