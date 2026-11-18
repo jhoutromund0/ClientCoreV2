@@ -1,7 +1,7 @@
 const User = require('../models/User');
 const auth = require('../middleware/auth');
 const render = (res, error = '', status = 200) => res.status(status).render('pages/login', { title: 'Entrar', error });
-exports.loginPage = (req, res) => req.user ? res.redirect('/painel') : render(res);
+exports.loginPage = (req, res) => req.user ? res.redirect('/dashboard') : render(res);
 exports.login = async (req, res) => {
     const email = String(req.body.email || '').trim().toLowerCase();
     const password = String(req.body.password || '');
@@ -11,7 +11,7 @@ exports.login = async (req, res) => {
     if (!user || !user.active || !await User.verifyPassword(password, user.password_hash))
         return render(res, 'E-mail ou senha inválidos.', 401);
     await auth.create(req, res, user);
-    return res.redirect('/painel');
+    return res.redirect('/dashboard');
 };
 exports.logout = async (req, res) => { await auth.destroy(req, res); res.redirect('/'); };
 exports.users = async (req, res) => res.render('users/index', { title: 'Usuários do sistema', users: await User.all(), error: null });
@@ -22,7 +22,7 @@ exports.createUser = async (req, res) => {
         return fail('Confira nome, e-mail, perfil e senha (mínimo 12 caracteres).');
     try {
         await User.create({ name: name.trim(), email: email.trim(), password, role });
-        res.redirect('/usuarios');
+        res.redirect('/configuracoes/usuarios');
     }
     catch (e) {
         if (e.code === '23505')
@@ -40,7 +40,7 @@ exports.updateUser = async (req, res) => {
         return fail('Você não pode retirar seu próprio acesso de administrador.');
     try {
         await User.update(req.params.id, { name: name.trim(), email: email.trim(), role, active, password });
-        res.redirect('/usuarios');
+        res.redirect('/configuracoes/usuarios');
     }
     catch (e) {
         if (e.code === '23505')
@@ -48,5 +48,9 @@ exports.updateUser = async (req, res) => {
         throw e;
     }
 };
-exports.removeUser = async (req, res) => { if (req.params.id === req.user.id)
-    return res.status(400).send('Não é possível excluir a própria conta.'); await User.remove(req.params.id); res.redirect('/usuarios'); };
+exports.removeUser = async (req, res) => {
+    if (req.params.id === req.user.id)
+        return res.status(400).send('Não é possível excluir a própria conta.');
+    await User.remove(req.params.id);
+    res.redirect('/configuracoes/usuarios');
+};

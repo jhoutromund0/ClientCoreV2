@@ -1,61 +1,112 @@
+<%
+const { period, periodLabel, monthLabel, appointments, attendanceBars = [], topMaterials, leader } = dashboard;
+const formatCount = new Intl.NumberFormat('pt-BR');
+const attendancePeak = Math.max(1, ...attendanceBars.map((entry) => entry.count));
+const materialPeak = Math.max(1, ...topMaterials.map((material) => material.visits));
+%>
 <main id="main-content" class="shell inner-page">
-  <span class="eyebrow">
-    PAINEL DE CONTROLE
-  </span>
-  <h1>
-    Visão geral da operação
-  </h1>
-  <p class="lead narrow">
-    Um ponto de partida para acompanhar os módulos do Client Core.
-  </p>
-  <div class="stats-grid">
-    <div class="stat-card">
-      <span>
-        Clientes cadastrados
-      </span>
-      <strong>
-        <%= clientCount %>
-      </strong>
-      <small>
-        Dados do PostgreSQL
-      </small>
+  <header class="page-title-row">
+    <h1>Dashboard</h1>
+    <nav class="dashboard-period" aria-label="Período do dashboard">
+      <a href="/dashboard?periodo=semana" aria-current="<%= period === 'semana' ? 'page' : 'false' %>">Semana</a>
+      <a href="/dashboard?periodo=mes" aria-current="<%= period === 'mes' ? 'page' : 'false' %>">Mês</a>
+    </nav>
+  </header>
+
+  <section class="panel dashboard-panel" aria-labelledby="dashboard-appointments-title">
+    <div class="panel-head dashboard-panel-head">
+      <div>
+        <h2 id="dashboard-appointments-title">Atendimentos</h2>
+        <p class="muted"><%= periodLabel %></p>
+      </div>
+      <p class="dashboard-appointment-count"><strong><%= formatCount.format(appointments.length) %></strong> <%= appointments.length === 1 ? 'atendimento' : 'atendimentos' %></p>
     </div>
-    <div class="stat-card">
-      <span>
-        Materiais em estoque
-      </span>
-      <strong>
-        <%= materialCount %>
-      </strong>
-      <small>
-        <a href="/materiais">
-          Abrir materiais
-        </a>
-      </small>
-    </div>
-    <div class="stat-card">
-      <span>
-        Visitas neste mês
-      </span>
-      <strong>
-        <%= visitCount %>
-      </strong>
-      <small>
-        <a href="/calendario">
-          Abrir calendário
-        </a>
-      </small>
-    </div>
-  </div>
-  <div class="callout">
-    <h2>
-      Operação do mês
-    </h2>
-    <p>
-      Clientes, materiais e visitas técnicas já podem ser cadastrados. Os dados são armazenados no PostgreSQL.
-    </p>
-    <a class="button" href="/calendario">
-      Agendar uma visita →
-    </a>
+    <% if (appointments.length) { %>
+      <% if (attendanceBars.length) { %>
+      <ul class="dashboard-activity" role="list" aria-label="Distribuição de atendimentos no período">
+        <% attendanceBars.forEach((entry) => { %>
+        <li>
+          <span class="dashboard-day-label"><%= entry.label %></span>
+          <strong><%= formatCount.format(entry.count) %></strong>
+          <span class="dashboard-activity-track" aria-hidden="true"><span style="height:<%= Math.round(entry.count / attendancePeak * 100) %>%"></span></span>
+        </li>
+        <% }) %>
+      </ul>
+      <% } %>
+      <div class="table-wrap dashboard-appointments" tabindex="0" role="region" aria-label="Lista de atendimentos">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Data</th>
+              <th scope="col">Cliente</th>
+              <th scope="col">Atendimento</th>
+              <th scope="col">Técnicos</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% appointments.forEach((appointment) => { %>
+            <tr>
+              <td><%= appointment.dateLabel %></td>
+              <td><strong><%= appointment.clientName %></strong></td>
+              <td><%= appointment.description || '—' %></td>
+              <td><%= appointment.technicians || '—' %></td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } else { %>
+      <p class="muted dashboard-empty">Nenhum atendimento agendado neste período.</p>
+    <% } %>
+  </section>
+
+  <div class="dashboard-rankings">
+    <section class="panel dashboard-panel" aria-labelledby="dashboard-materials-title">
+      <div class="panel-head">
+        <div>
+          <h2 id="dashboard-materials-title">Materiais mais utilizados</h2>
+          <p class="muted"><%= monthLabel %> · Contagem por atendimento com uso registrado</p>
+        </div>
+      </div>
+      <% if (topMaterials.length) { %>
+      <ol class="dashboard-materials" role="list">
+        <% topMaterials.forEach((material) => { %>
+        <li>
+          <div>
+            <strong><%= material.name %></strong>
+            <span class="muted"><%= formatCount.format(material.visits) %> <%= material.visits === 1 ? 'atendimento' : 'atendimentos' %></span>
+          </div>
+          <span class="dashboard-material-track" aria-hidden="true"><span style="width:<%= Math.round(material.visits / materialPeak * 100) %>%"></span></span>
+        </li>
+        <% }) %>
+      </ol>
+      <% } else { %>
+      <p class="muted dashboard-empty">Nenhum uso de material registrado neste mês.</p>
+      <% } %>
+    </section>
+
+    <section class="panel dashboard-panel" aria-labelledby="dashboard-kilometers-title">
+      <div class="panel-head">
+        <div>
+          <h2 id="dashboard-kilometers-title">Maior quilometragem por analista</h2>
+          <p class="muted">Deslocamentos estimados de ida e volta até hoje no período selecionado</p>
+        </div>
+      </div>
+      <% if (leader) { %>
+      <div class="dashboard-leader">
+        <strong class="dashboard-leader-km"><%= leader.kilometers %></strong>
+        <ul class="dashboard-leader-names" role="list" aria-label="Analistas com maior quilometragem">
+          <% leader.names.forEach((name) => { %>
+          <li><%= name %></li>
+          <% }) %>
+        </ul>
+        <% if (leader.names.length === 1 && Number.isInteger(leader.visits)) { %>
+        <p class="muted"><%= formatCount.format(leader.visits) %> <%= leader.visits === 1 ? 'atendimento com distância calculada' : 'atendimentos com distância calculada' %></p>
+        <% } %>
+      </div>
+      <% } else { %>
+      <p class="muted dashboard-empty">Nenhum atendimento com distância calculada e analista identificado neste período.</p>
+      <% } %>
+    </section>
   </div>
 </main>

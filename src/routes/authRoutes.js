@@ -5,7 +5,7 @@ const wrap = require('../middleware/asyncHandler');
 router.get('/login', wrap(c.loginPage));
 router.post('/login', wrap(c.login));
 router.post('/sair', a.requireAuth, wrap(c.logout));
-router.get('/usuarios', a.requireRole('admin'), wrap(c.users));
+router.get('/usuarios', a.requireRole('admin'), (req, res) => res.redirect('/configuracoes/usuarios'));
 router.post('/usuarios', a.requireRole('admin'), wrap(c.createUser));
 router.post('/usuarios/:id', a.requireRole('admin'), wrap(c.updateUser));
 router.post('/usuarios/:id/excluir', a.requireRole('admin'), wrap(c.removeUser));

@@ -1,5 +1,26 @@
+<%
+const path = typeof currentPath === 'string' ? currentPath : '';
+const links = user
+  ? [
+      { href: '/dashboard', label: 'Dashboard' },
+      { href: '/clientes', label: 'Clientes' },
+      { href: '/materiais', label: 'Materiais' },
+      { href: '/calendario', label: 'Calendário' }
+    ]
+  : [
+      { href: '/', label: 'Início' },
+      { href: '/sobre', label: 'Sobre' }
+    ];
+
+if (user?.role === 'admin') {
+  links.push(
+    { href: '/financeiro', label: 'Financeiro' },
+    { href: '/configuracoes', label: 'Configurações' }
+  );
+}
+%>
 <header class="site-header">
-  <a class="brand" href="/">
+  <a class="brand" href="<%= user ? '/dashboard' : '/' %>">
     <span class="brand-mark">
       C
     </span>
@@ -10,60 +31,27 @@
       </span>
     </span>
   </a>
-  <button class="menu-toggle" type="button" aria-label="Abrir menu" aria-expanded="false">
+  <button class="menu-toggle" type="button" aria-label="Abrir menu" aria-expanded="false" aria-controls="main-nav">
     ☰
   </button>
-  <nav class="main-nav" aria-label="Navegação principal">
-    <a href="/">
-      Início
-    </a>
-    <a href="/sobre">
-      Sobre
-    </a>
-    <% if(user){ %>
-    <a href="/clientes">
-      Clientes
-    </a>
-    <a href="/materiais">
-      Materiais
-    </a>
-    <a href="/calendario">
-      Calendário
-    </a>
-    <a href="/painel">
-      Painel
-    </a>
-    <% if(user.role==='admin'){ %>
-    <a href="/financeiro">
-      Financeiro
-    </a>
-    <a href="/usuarios">
-      Usuários
-    </a>
-    <a href="/configuracoes">
-      Configurações
-    </a>
-    <% } %>
-    <% } %>
+  <nav class="main-nav" id="main-nav" aria-label="Navegação principal">
+    <% links.forEach(({ href, label }) => {
+      const aliases = href === '/configuracoes' && (path === '/usuarios' || path.startsWith('/usuarios/'));
+      const section = aliases || (href !== '/' && path.startsWith(href + '/'));
+    %>
+    <a href="<%= href %>"<% if (path === href || section) { %> aria-current="<%= path === href ? 'page' : 'location' %>"<% } %>><%= label %></a>
+    <% }) %>
   </nav>
   <div class="header-actions">
-    <% if(user){ %>
-    <span class="muted">
-      <%= user.name %>
-      (
-      <%= user.role %>
-      )
-    </span>
+    <% if (user) { %>
+    <span class="muted header-account" title="<%= user.name %> (<%= user.role %>)"><%= user.name %> (<%= user.role %>)</span>
     <form method="post" action="/sair">
-      <% if (typeof csrfToken !== "undefined" && csrfToken) { %>
-      <input type="hidden" name="_csrf" value="<%= csrfToken %>
-      ">
-      <% } %>
+      <%- include('csrf-field') %>
       <button class="button button-small">
         Sair
       </button>
     </form>
-    <% }else{ %>
+    <% } else { %>
     <a class="login-link" href="/login">
       Entrar
     </a>

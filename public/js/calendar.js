@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const lista = document.getElementById('visitas-do-dia');
     const modal = document.getElementById('modal-agendar');
     const form = document.getElementById('form-visita');
+    const csrfToken = form.querySelector('input[name="_csrf"]')?.value || '';
     const titulo = document.getElementById('modal-title');
     const modalData = document.getElementById('modal-data');
     const campoData = document.getElementById('visita-data');
@@ -114,6 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="actions">
           <button type="button" class="text-button editar-visita" data-id="${esc(visita.id)}">Editar</button>
           <form action="/calendario/${esc(visita.id)}/excluir" method="post" data-confirm="Excluir esta visita?">
+            <input type="hidden" name="_csrf" value="${esc(csrfToken)}">
             <button class="text-button danger" type="submit">Excluir</button>
           </form>
         </div>

@@ -15,7 +15,8 @@
   </div>
 
   <div class="split-layout">
-    <form id="material-form" class="panel-form" method="post" action="<%= materialData && materialData.id ? '/materiais/' + materialData.id : '/materiais' %><% if (typeof csrfToken !== "undefined" && csrfToken) { %><input type="hidden" name="_csrf" value="<%= csrfToken %>"><% } %>" autocomplete="off">
+    <form id="material-form" class="panel-form" method="post" action="<%= materialData && materialData.id ? '/materiais/' + materialData.id : '/materiais' %>" autocomplete="off">
+      <%- include('../partials/csrf-field') %>
       <h2 id="form-title"><%= materialData && materialData.id ? 'Editar material' : 'Adicionar material' %></h2>
       <% if (errors && errors.length) { %>
         <div class="validation-errors" role="alert"><strong>Revise os campos:</strong><ul><% errors.forEach(error => { %><li><%= error.msg %></li><% }) %></ul></div>
@@ -79,7 +80,10 @@
                 <td><%= (Number(item.measure) * Number(item.unitValue)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) %></td>
                 <td class="actions">
                   <a href="/materiais/<%= item.id %>/editar">Editar</a>
-                  <form action="/materiais/<%= item.id %>/excluir" method="post" data-confirm="Excluir este material?"><button class="text-button danger" type="submit">Excluir</button></form>
+                  <form action="/materiais/<%= item.id %>/excluir" method="post" data-confirm="Excluir este material?">
+                    <%- include('../partials/csrf-field') %>
+                    <button class="text-button danger" type="submit">Excluir</button>
+                  </form>
                 </td>
               </tr>
             <% }) %>
