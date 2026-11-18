@@ -84,7 +84,6 @@ async function renderUsers(req, res, { error = null, status = 200, link = null }
 function renderLink(req, res, origin, token, email) {
     const url = new URL(setupPath, origin);
     url.searchParams.set('token', token);
-    res.set('Referrer-Policy', 'no-referrer');
     return renderUsers(req, res, { link: { url: url.href, email } });
 }
 

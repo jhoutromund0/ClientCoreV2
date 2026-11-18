@@ -110,6 +110,8 @@ O financeiro mantém um lançamento por visita. Para corrigir os dados de origem
 
 Para criar o primeiro administrador em um banco novo, execute `node script/create-admin.js`. Para verificar o código sem conexão com o banco, use `npm run check`.
 
+Para rodar localmente por HTTP, use `NODE_ENV=development`, `APP_URL=http://localhost:3000` e `PORT=3000` no ambiente local.
+
 ## Deslocamento de clientes e visitas
 
 Em **Configurações**, o administrador define o endereço de partida e a tarifa em reais por quilômetro. O sistema calcula a rota de carro para o endereço efetivo da visita, registra as distâncias de ida e de ida e volta e multiplica a distância total pela tarifa. Alterações no local ou nas configurações atualizam as estimativas em segundo plano. Lançamentos já concluídos mantêm o custo registrado.

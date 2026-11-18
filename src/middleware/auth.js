@@ -7,6 +7,7 @@ if (!secret || secret.length < 32)
     throw new Error('SESSION_SECRET deve conter pelo menos 32 caracteres');
 
 const secure = process.env.NODE_ENV === 'production';
+const renderTerminatesHttps = secure && process.env.RENDER === 'true';
 const cookieOptions = { httpOnly: true, secure, sameSite: 'lax', path: '/' };
 const cookieName = secure ? '__Host-cc_session' : 'cc_session';
 const formCookieName = secure ? '__Host-cc_form' : 'cc_form';
@@ -40,7 +41,8 @@ function parseOrigin(value, requireHttps = false) {
 
 function requestOrigin(req) {
     try {
-        return parseOrigin(`${req.protocol}://${req.get('host')}`);
+        const protocol = renderTerminatesHttps ? 'https' : req.protocol;
+        return parseOrigin(`${protocol}://${req.get('host')}`, secure);
     } catch {
         return null;
     }
@@ -138,7 +140,7 @@ async function load(req, res, next) {
         }
 
         if (isFormPath(req)) {
-            res.set({ 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' });
+            res.set('Cache-Control', 'no-store');
             if (!req.user) {
                 let seed = readCookie(req, formCookieName);
                 if (safeMethods.has(req.method)) {
@@ -250,10 +252,13 @@ function csrf(req, res, next) {
     if (safeMethods.has(req.method)) return next();
 
     const origin = req.get('origin');
-    const expected = appOrigin || requestOrigin(req);
-    if (origin && origin !== expected)
+    const fetchSite = req.get('sec-fetch-site');
+    const requiresToken = Boolean(req.user) || isFormPath(req);
+    // O proxy pode reescrever o endereço recebido pelo servidor. O token continua obrigatório para o formulário.
+    const sameOriginForm = requiresToken && fetchSite === 'same-origin';
+    if (fetchSite === 'cross-site' || (origin && !sameOriginForm && origin !== appOrigin && origin !== requestOrigin(req)))
         return rejectCsrf(req, res, 'csrf_origin_rejected');
-    if (!req.user && !isFormPath(req)) return next();
+    if (!requiresToken) return next();
 
     const value = req.body?._csrf;
     const bucket = Math.floor(Date.now() / csrfPeriod);

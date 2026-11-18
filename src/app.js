@@ -29,7 +29,11 @@ app.use(expressLayouts);
 const cspDirectives = { 'style-src': ["'self'"], 'font-src': ["'self'"] };
 if (!isProduction)
     cspDirectives['upgrade-insecure-requests'] = null;
-app.use(helmet({ contentSecurityPolicy: { directives: cspDirectives }, hsts: isProduction }));
+app.use(helmet({
+    contentSecurityPolicy: { directives: cspDirectives },
+    referrerPolicy: { policy: 'strict-origin' },
+    hsts: isProduction
+}));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use((req, res, next) => {
     Object.assign(res.locals, { currentPath: req.path, flash: null, user: null, csrfToken: null });
