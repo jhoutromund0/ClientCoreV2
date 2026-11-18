@@ -2,6 +2,7 @@ node_modules/
 .var
 .env
 .env.*
+!.env.example
 *.log
 .DS_Store
 .gitignore

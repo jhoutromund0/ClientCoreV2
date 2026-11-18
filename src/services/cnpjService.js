@@ -1,16 +1,11 @@
-/**
- * Consulta pública de CNPJ via CNPJá Open API (https://open.cnpja.com/office/:cnpj).
- * - Sem autenticação; limite do provedor: 5 consultas por minuto por IP.
- * - Por isso há cache em memória e um limitador próprio (evita estourar o limite e tomar 429).
- * Obs.: use os dados respeitando os Termos de Uso do CNPJá e a legislação aplicável.
- */
+const RATE_WINDOW_MS = 60_000;
+const REQUESTS_PER_USER = 12;
+const PROVIDER_REQUESTS_PER_USER = 2;
+const PROVIDER_REQUESTS_TOTAL = 5;
+const providerKey = 'provider';
 const BASE_URL = () => (process.env.CNPJA_BASE_URL || 'https://open.cnpja.com/office').replace(/\/+$/, '');
 const TIMEOUT_MS = () => Number(process.env.CNPJA_TIMEOUT_MS || 8000);
-const CACHE_TTL_MS = 60 * 60 * 1000;
-const RATE_LIMIT = 5;
-const RATE_WINDOW_MS = 60 * 1000;
-const cache = new Map(); // cnpj -> { data, expires }
-let calls = []; // timestamps das chamadas feitas ao provedor
+
 class CnpjError extends Error {
     constructor(status, message, extra = {}) {
         super(message);
@@ -72,23 +67,62 @@ function mapOffice(office) {
         establishmentType
     };
 }
-function takeRateSlot() {
-    const now = Date.now();
-    calls = calls.filter((t) => now - t < RATE_WINDOW_MS);
-    if (calls.length >= RATE_LIMIT) {
-        return Math.ceil((RATE_WINDOW_MS - (now - calls[0])) / 1000);
-    }
-    calls.push(now);
-    return 0;
+async function lockRate(client, key, limit) {
+    const { rows: [rate] } = await client.query(`
+        INSERT INTO cnpj_lookup_limits (key) VALUES ($1)
+        ON CONFLICT (key) DO UPDATE SET updated_at = clock_timestamp()
+        RETURNING hits, cooldown_until, clock_timestamp() AS now
+    `, [key]);
+    const now = rate.now.getTime();
+    const hits = rate.hits.filter(hit => hit.getTime() > now - RATE_WINDOW_MS);
+    const windowEnd = hits.length >= limit ? hits[0].getTime() + RATE_WINDOW_MS : now;
+    const until = Math.max(windowEnd, rate.cooldown_until?.getTime() ?? now);
+    return { key, hits: [...hits, rate.now], wait: Math.ceil((until - now) / 1000) };
 }
-async function lookup(rawCnpj) {
+
+function recordHits(client, rate) {
+    return client.query('UPDATE cnpj_lookup_limits SET hits = $2 WHERE key = $1', [rate.key, rate.hits]);
+}
+
+async function reserve(cnpj, userId) {
+    const { withTransaction } = require('../config/database');
+    return withTransaction(async (client) => {
+        const userRate = await lockRate(client, `user:${userId}`, REQUESTS_PER_USER);
+        if (userRate.wait)
+            return { wait: userRate.wait };
+        await recordHits(client, userRate);
+        const { rows: [cached] } = await client.query(
+            'SELECT data FROM cnpj_lookup_cache WHERE cnpj = $1 AND expires_at > NOW()', [cnpj]
+        );
+        if (cached)
+            return { cached: cached.data };
+        const userMisses = await lockRate(client, `user-provider:${userId}`, PROVIDER_REQUESTS_PER_USER);
+        if (userMisses.wait)
+            return { wait: userMisses.wait };
+        const provider = await lockRate(client, providerKey, PROVIDER_REQUESTS_TOTAL);
+        if (provider.wait)
+            return { wait: provider.wait };
+        await recordHits(client, userMisses);
+        await recordHits(client, provider);
+        return {};
+    });
+}
+
+function providerWait(value) {
+    if (/^\d+$/.test(value))
+        return Math.min(86400, Math.max(1, Number(value)));
+    const date = Date.parse(value);
+    return Number.isFinite(date) ? Math.min(86400, Math.max(1, Math.ceil((date - Date.now()) / 1000))) : 60;
+}
+
+async function lookup(rawCnpj, userId) {
     const cnpj = normalizeCnpj(rawCnpj);
     if (!isValidCnpj(cnpj))
         throw new CnpjError(400, 'CNPJ inválido. Confira os 14 caracteres informados.');
-    const cached = cache.get(cnpj);
-    if (cached && cached.expires > Date.now())
-        return { ...cached.data, cached: true };
-    const wait = takeRateSlot();
+    const { query } = require('../config/database');
+    const { cached, wait } = await reserve(cnpj, userId);
+    if (cached)
+        return { ...cached, cached: true };
     if (wait)
         throw new CnpjError(429, `Limite de consultas atingido. Tente novamente em ${wait}s.`, { retryAfter: wait });
     let response;
@@ -106,7 +140,12 @@ async function lookup(rawCnpj) {
     if (response.status === 404)
         throw new CnpjError(404, 'CNPJ não encontrado na base da Receita Federal.');
     if (response.status === 429) {
-        const retryAfter = Number(response.headers.get('retry-after')) || 60;
+        const retryAfter = providerWait(response.headers.get('retry-after'));
+        await query(`
+            INSERT INTO cnpj_lookup_limits (key, cooldown_until)
+            VALUES ($1, NOW() + make_interval(secs => $2))
+            ON CONFLICT (key) DO UPDATE SET cooldown_until = GREATEST(cnpj_lookup_limits.cooldown_until, EXCLUDED.cooldown_until)
+        `, [providerKey, retryAfter]);
         throw new CnpjError(429, `O serviço de consulta atingiu o limite. Tente novamente em ${retryAfter}s.`, { retryAfter });
     }
     if (!response.ok)
@@ -118,11 +157,14 @@ async function lookup(rawCnpj) {
     catch (err) {
         throw new CnpjError(502, 'Resposta inesperada do serviço de consulta de CNPJ.');
     }
-    if (!office || typeof office !== 'object')
+    if (!office || typeof office !== 'object' || Array.isArray(office))
         throw new CnpjError(502, 'Resposta inesperada do serviço de consulta de CNPJ.');
     const data = mapOffice({ ...office, taxId: cnpj });
-    cache.set(cnpj, { data, expires: Date.now() + CACHE_TTL_MS });
+    await query(`
+        INSERT INTO cnpj_lookup_cache (cnpj, data, expires_at)
+        VALUES ($1, $2::jsonb, NOW() + INTERVAL '1 hour')
+        ON CONFLICT (cnpj) DO UPDATE SET data = EXCLUDED.data, expires_at = EXCLUDED.expires_at
+    `, [cnpj, JSON.stringify(data)]);
     return { ...data, cached: false };
 }
-function _resetForTests() { cache.clear(); calls = []; }
-module.exports = { lookup, isValidCnpj, onlyDigits, formatCnpj, mapOffice, CnpjError, _resetForTests };
+module.exports = { lookup, isValidCnpj, onlyDigits, formatCnpj, mapOffice, CnpjError };

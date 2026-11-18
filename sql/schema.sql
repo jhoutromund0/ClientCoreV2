@@ -1,3 +1,4 @@
+-- Esquema inicial. npm run db:migrate aplica este arquivo e as migrações versionadas.
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE TABLE IF NOT EXISTS users (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),name VARCHAR(120) NOT NULL,email VARCHAR(254) NOT NULL UNIQUE,password_hash TEXT NOT NULL,role VARCHAR(12) NOT NULL CHECK(role IN ('admin','analista')),active BOOLEAN NOT NULL DEFAULT TRUE,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS sessions(token_hash CHAR(64) PRIMARY KEY,user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,csrf_token CHAR(64) NOT NULL,expires_at TIMESTAMPTZ NOT NULL);

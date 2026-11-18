@@ -10,11 +10,20 @@
   <% if (error) { %>
   <p class="validation-errors" role="alert"><%= error %></p>
   <% } %>
+  <% if (link) { %>
+  <section class="panel-form" aria-labelledby="password-link-heading">
+    <h2 id="password-link-heading">Link para definir a senha</h2>
+    <p class="muted">Envie o link em particular para <%= link.email %>. Ele é válido por uma hora e pode ser usado uma vez.</p>
+    <label>Link de acesso
+      <input readonly type="text" value="<%= link.url %>">
+    </label>
+  </section>
+  <% } %>
 
   <div class="split-layout users-layout">
     <form class="panel-form" method="post" action="/configuracoes/usuarios" aria-labelledby="new-user-heading">
       <%- include('../partials/csrf-field') %>
-      <h2 id="new-user-heading">Adicionar usuário</h2>
+      <h2 id="new-user-heading">Convidar usuário</h2>
       <div class="form-grid one-col">
         <label>Nome
           <input name="name" minlength="2" maxlength="120" required>
@@ -22,18 +31,18 @@
         <label>E-mail
           <input name="email" type="email" maxlength="254" required>
         </label>
-        <label>Senha (mínimo 12 caracteres)
-          <input name="password" type="password" autocomplete="new-password" minlength="12" maxlength="200" required>
-        </label>
         <label>Perfil
           <select name="role">
             <option value="analista">Analista</option>
             <option value="admin">Administrador</option>
           </select>
         </label>
+        <label>Sua senha atual
+          <input name="currentPassword" type="password" autocomplete="current-password" maxlength="200" required>
+        </label>
       </div>
       <div class="form-actions">
-        <button class="button" type="submit">Adicionar usuário</button>
+        <button class="button" type="submit">Gerar convite</button>
       </div>
     </form>
 
@@ -53,11 +62,11 @@
             </span>
             <span class="user-account-status">
               <span><%= account.role === 'admin' ? 'Administrador' : 'Analista' %></span>
-              <span class="user-status<%= account.active ? ' user-status-active' : '' %>"><%= account.active ? 'Ativa' : 'Inativa' %></span>
+              <span class="user-status<%= account.active && !account.pending ? ' user-status-active' : '' %>"><%= !account.active ? 'Inativa' : account.pending ? 'Convite pendente' : 'Ativa' %></span>
             </span>
           </summary>
           <div class="user-account-body">
-            <form id="edit-user-<%= account.id %>" class="panel-form plain" method="post" action="/configuracoes/usuarios/<%= account.id %>">
+            <form class="panel-form plain" method="post" action="/configuracoes/usuarios/<%= account.id %>">
               <%- include('../partials/csrf-field') %>
               <div class="form-grid">
                 <label>Nome
@@ -72,24 +81,40 @@
                     <option value="admin"<%= account.role === 'admin' ? ' selected' : '' %>>Administrador</option>
                   </select>
                 </label>
-                <label>Nova senha (opcional)
-                  <input name="password" type="password" autocomplete="new-password" minlength="12" maxlength="200">
+                <label>Sua senha atual
+                  <input name="currentPassword" type="password" autocomplete="current-password" maxlength="200" required>
                 </label>
                 <label class="user-active">
                   <input name="active" type="checkbox" value="on"<%= account.active ? ' checked' : '' %>>
                   Conta ativa
                 </label>
               </div>
+              <div class="form-actions">
+                <button class="button" type="submit">Salvar alterações</button>
+              </div>
             </form>
-            <div class="form-actions">
               <% if (!isOwnAccount) { %>
-              <form method="post" action="/configuracoes/usuarios/<%= account.id %>/excluir" data-confirm="Excluir esta conta?">
-                <%- include('../partials/csrf-field') %>
+            <% if (account.active) { %>
+            <form class="panel-form plain" method="post" action="/configuracoes/usuarios/<%= account.id %>/recuperar">
+              <%- include('../partials/csrf-field') %>
+              <label>Sua senha atual
+                <input name="currentPassword" type="password" autocomplete="current-password" maxlength="200" required>
+              </label>
+              <div class="form-actions">
+                <button class="button button-ghost" type="submit">Gerar novo link de acesso</button>
+              </div>
+            </form>
+            <% } %>
+            <form class="panel-form plain" method="post" action="/configuracoes/usuarios/<%= account.id %>/excluir" data-confirm="Excluir esta conta?">
+              <%- include('../partials/csrf-field') %>
+              <label>Sua senha atual
+                <input name="currentPassword" type="password" autocomplete="current-password" maxlength="200" required>
+              </label>
+              <div class="form-actions">
                 <button class="button button-ghost danger" type="submit">Excluir usuário</button>
-              </form>
-              <% } %>
-              <button class="button" type="submit" form="edit-user-<%= account.id %>">Salvar alterações</button>
-            </div>
+              </div>
+            </form>
+            <% } %>
           </div>
         </details>
         <% }) %>
@@ -97,6 +122,7 @@
       <% } else { %>
       <p class="muted">Nenhuma conta cadastrada.</p>
       <% } %>
+      <%- include('../partials/pagination', { page, path: '/configuracoes/usuarios' }) %>
     </section>
   </div>
 </main>

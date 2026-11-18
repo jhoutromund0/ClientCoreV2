@@ -44,7 +44,7 @@ if (user?.role === 'admin') {
   </nav>
   <div class="header-actions">
     <% if (user) { %>
-    <span class="muted header-account" title="<%= user.name %> (<%= user.role %>)"><%= user.name %> (<%= user.role %>)</span>
+    <a class="muted header-account" href="/conta" title="<%= user.name %> (<%= user.role %>)"<% if (path === '/conta') { %> aria-current="page"<% } %>><%= user.name %> (<%= user.role %>)</a>
     <form method="post" action="/sair">
       <%- include('csrf-field') %>
       <button class="button button-small">

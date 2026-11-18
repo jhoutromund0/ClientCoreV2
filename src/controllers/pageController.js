@@ -3,17 +3,10 @@ const render = (view, title, extra = {}) => (req, res) => res.render(view, { tit
 module.exports = {
     home: render('pages/home', 'Início'),
     about: render('pages/about', 'Sobre'),
-    login: render('pages/login', 'Entrar'),
-    register: render('pages/register', 'Criar conta'),
     dashboard: async (req, res) => res.render('pages/dashboard', {
         title: 'Dashboard',
         dashboard: await dashboardService.load(req.query.periodo)
     }),
-    // Autenticação ainda não existe: evita enviar credenciais pela URL e informa o estado atual.
-    authNotReady: (redirectTo) => (req, res) => {
-        req.app.locals.flash = { type: 'info', message: 'A autenticação ainda não está conectada. Nenhum dado foi salvo.' };
-        res.redirect(redirectTo);
-    },
     notFound: (req, res) => res.status(404).render('pages/error', {
         title: 'Página não encontrada',
         code: 404,

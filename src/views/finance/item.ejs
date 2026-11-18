@@ -1,6 +1,9 @@
-<fieldset data-material-row>
+<fieldset class="panel finance-material" data-material-row>
   <legend>Material</legend>
   <div class="form-grid">
+    <label>Buscar no catálogo
+      <input type="search" data-catalog-search maxlength="120" autocomplete="off" placeholder="Nome do material">
+    </label>
     <label>Preencher pelo catálogo
       <select data-catalog>
         <option value="">Selecione um material</option>
@@ -8,6 +11,7 @@
           <option value="<%= material.id %>" data-name="<%= material.name %>" data-unit="<%= material.unit %>" data-cost="<%= material.unitValue.toFixed(2) %>"><%= material.name %></option>
         <% }) %>
       </select>
+      <span class="sr-only" data-catalog-status role="status"></span>
     </label>
     <label>Nome do material
       <input name="name" maxlength="120" value="<%= item.name %>" required>
@@ -27,13 +31,13 @@
       </select>
     </label>
     <label>Quantidade
-      <input name="quantity" inputmode="decimal" maxlength="10" value="<%= item.quantity %>" required>
+      <input name="quantity" inputmode="decimal" maxlength="8" value="<%= item.quantity %>" required>
     </label>
     <label>Custo unitário (R$)
-      <input name="cost" inputmode="decimal" maxlength="11" value="<%= item.cost %>" required>
+      <input name="cost" inputmode="decimal" maxlength="9" value="<%= item.cost %>" required>
     </label>
     <label>Preço unitário cobrado (R$)
-      <input name="price" inputmode="decimal" maxlength="11" value="<%= item.price %>" required>
+      <input name="price" inputmode="decimal" maxlength="9" value="<%= item.price %>" required>
     </label>
   </div>
   <button type="button" class="text-button danger" data-remove-material>Remover material</button>

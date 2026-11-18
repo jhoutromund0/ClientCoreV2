@@ -7,7 +7,8 @@
       <ul><% errors.forEach((error) => { %><li><%= error %></li><% }) %></ul>
     </div>
   <% } %>
-  <form id="finance-form" method="post" action="/financeiro/atendimentos/<%= visit.id %><% if (typeof csrfToken !== "undefined" && csrfToken) { %><input type="hidden" name="_csrf" value="<%= csrfToken %>"><% } %>">
+  <form id="finance-form" class="panel-form" method="post" action="/financeiro/atendimentos/<%= visit.id %>" data-max-materials="25">
+    <%- include('../partials/csrf-field') %>
     <div class="form-grid">
       <% if (visit.description === 'Orçamento') { %>
         <label>Situação do orçamento
@@ -19,25 +20,26 @@
         </label>
       <% } %>
       <label>Valor do serviço (R$)
-        <input name="labor" inputmode="decimal" maxlength="11" value="<%= draft.labor %>" required>
+        <input name="labor" inputmode="decimal" maxlength="9" value="<%= draft.labor %>" required>
       </label>
       <label>Valor recebido (R$)
-        <input name="received" inputmode="decimal" maxlength="11" value="<%= draft.received %>" required>
+        <input name="received" inputmode="decimal" maxlength="9" value="<%= draft.received %>" required>
       </label>
     </div>
     <h2>Materiais do atendimento</h2>
     <p class="muted">Informe o custo e quanto será cobrado do cliente por unidade. A quantidade lançada serve para o cálculo financeiro.</p>
-    <div id="finance-items">
+    <div id="finance-items" class="stack">
       <% draft.items.forEach((item) => { %>
         <%- include('item', { item }) %>
       <% }) %>
     </div>
-    <button id="finance-add" type="button" class="button button-ghost">Adicionar material</button>
+    <button id="finance-add" type="button" class="button button-ghost" hidden>Adicionar material</button>
     <p class="muted" id="finance-preview" aria-live="polite"></p>
     <button type="submit" class="button">Salvar lançamento</button>
   </form>
   <% if (hasRecord) { %>
-    <form method="post" action="/financeiro/atendimentos/<%= visit.id %><% if (typeof csrfToken !== "undefined" && csrfToken) { %><input type="hidden" name="_csrf" value="<%= csrfToken %>"><% } %>/excluir" data-confirm="Excluir o lançamento financeiro deste atendimento?">
+    <form method="post" action="/financeiro/atendimentos/<%= visit.id %>/excluir" data-confirm="Excluir o lançamento financeiro deste atendimento?">
+      <%- include('../partials/csrf-field') %>
       <button type="submit" class="text-button danger">Excluir lançamento</button>
     </form>
   <% } %>

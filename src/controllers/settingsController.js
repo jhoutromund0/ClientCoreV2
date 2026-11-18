@@ -27,6 +27,6 @@ exports.save = async (req, res) => {
 
     const rateCentsPerKm = Number(match[1]) * 100 + Number((match[2] || '').padEnd(2, '0'));
     await TransportSettings.save({ originAddress, rateCentsPerKm });
-    req.app.locals.flash = { type: 'success', message: 'Configurações de deslocamento salvas.' };
+    await req.setFlash({ type: 'success', message: 'Configurações de deslocamento salvas.' });
     return res.redirect('/configuracoes');
 };

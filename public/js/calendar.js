@@ -5,8 +5,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     const payload = JSON.parse(dataNode.textContent);
     const visitas = payload.visits || [];
-    const busca = document.getElementById('buscar-cliente');
-    const totalVisitas = document.getElementById('total-visitas');
     const totalVisitasMes = document.getElementById('total-visitas-mes');
     const mesAno = document.getElementById('mes-ano');
     const lista = document.getElementById('visitas-do-dia');
@@ -17,11 +15,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalData = document.getElementById('modal-data');
     const campoData = document.getElementById('visita-data');
     const campoCliente = document.getElementById('visita-cliente');
+    const clienteId = document.getElementById('visita-cliente-id');
+    const opcoesClientes = document.getElementById('clientes-list');
     const campoTipo = document.getElementById('visita-tipo');
     const campoMateriais = document.getElementById('visita-materiais');
     const campoTecnicos = document.getElementById('visita-tecnicos');
+    const [year, month] = payload.month.split('-').map(Number);
     const hoje = new Date();
-    const state = { year: hoje.getFullYear(), month: hoje.getMonth(), filtro: '' };
     const fmtData = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
     const fmtMes = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' });
     function esc(value) {
@@ -37,16 +37,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     function parseIso(value) {
         const [y, m, d] = String(value).slice(0, 10).split('-').map(Number);
-        return new Date(y, m - 1, d);
+        const date = new Date(y, m - 1, d);
+        return iso(date) === String(value).slice(0, 10) ? date : null;
     }
-    function mesmoDia(isoDate, date) {
-        return isoDate.slice(0, 10) === iso(date);
-    }
-    function filtradas() {
-        const termo = state.filtro.trim().toLocaleLowerCase('pt-BR');
-        if (!termo)
-            return visitas;
-        return visitas.filter((visita) => visita.clientName.toLocaleLowerCase('pt-BR').includes(termo));
+    function rotuloData(value) {
+        const date = parseIso(value);
+        return date ? fmtData.format(date) : 'Data inválida';
     }
     function abrirModal(date, visita) {
         form.action = visita ? `/calendario/${visita.id}` : '/calendario';
@@ -56,6 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
             : `Data selecionada: ${fmtData.format(date)}`;
         campoData.value = visita ? visita.scheduledAt.slice(0, 10) : iso(date);
         campoCliente.value = visita ? visita.clientName : '';
+        clienteId.value = visita ? visita.clientId : '';
         campoTipo.value = visita ? visita.description : '';
         campoMateriais.value = visita ? (visita.materials || '') : '';
         campoTecnicos.value = visita ? (visita.technicians || '') : '';
@@ -65,16 +62,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function fecharModal() {
         modal.hidden = true;
     }
-    function render() {
-        const listaVisitas = filtradas();
-        mesAno.textContent = fmtMes.format(new Date(state.year, state.month, 1));
-        totalVisitas.textContent = String(listaVisitas.length);
-        totalVisitasMes.textContent = String(listaVisitas.filter((visita) => {
-            const data = parseIso(visita.scheduledAt);
-            return data.getMonth() === state.month && data.getFullYear() === state.year;
-        }).length);
-        const firstDay = new Date(state.year, state.month, 1).getDay();
-        const days = new Date(state.year, state.month + 1, 0).getDate();
+    function renderMonth() {
+        mesAno.textContent = fmtMes.format(new Date(year, month - 1, 1));
+        totalVisitasMes.textContent = String(Object.values(payload.days).reduce((total, day) => total + day.count, 0));
+        const firstDay = new Date(year, month - 1, 1).getDay();
+        const days = new Date(year, month, 0).getDate();
         grid.innerHTML = '';
         for (let blank = 0; blank < firstDay; blank += 1) {
             const placeholder = document.createElement('div');
@@ -82,32 +74,32 @@ document.addEventListener('DOMContentLoaded', () => {
             grid.appendChild(placeholder);
         }
         for (let day = 1; day <= days; day += 1) {
-            const date = new Date(state.year, state.month, day);
-            const doDia = listaVisitas.filter((visita) => mesmoDia(visita.scheduledAt, date));
-            const isToday = mesmoDia(iso(hoje), date);
-            const mostra = !state.filtro || doDia.length > 0;
+            const date = new Date(year, month - 1, day);
+            const doDia = payload.days[iso(date)];
+            const isToday = iso(hoje) === iso(date);
             const cell = document.createElement('div');
-            cell.className = `day-cell${isToday ? ' today' : ''}${mostra ? '' : ' dim'}`;
+            cell.className = `day-cell${isToday ? ' today' : ''}`;
             cell.innerHTML = `
         <div class="day-top">
           <span>${day}</span>
           <button type="button" class="agendar-dia" data-day="${day}" aria-label="Agendar visita no dia ${day}">+</button>
         </div>
         <div class="day-visits">
-          ${doDia.length ? `<span class="visit-count">${doDia.length} visita${doDia.length > 1 ? 's' : ''}</span>` : ''}
-          ${doDia.slice(0, 2).map((visita) => `<div class="day-chip"><strong>${esc(visita.clientName)}</strong><span>${esc(visita.description)}</span></div>`).join('')}
+          ${doDia ? `<span class="visit-count">${doDia.count} visita${doDia.count > 1 ? 's' : ''}</span>` : ''}
+          ${doDia ? doDia.preview.map((visita) => `<div class="day-chip"><strong>${esc(visita.clientName)}</strong><span>${esc(visita.description)}</span></div>`).join('') : ''}
         </div>
-        ${mostra ? '' : '<span class="no-visit">Sem visitas</span>'}
       `;
             grid.appendChild(cell);
         }
-        if (!listaVisitas.length) {
-            lista.innerHTML = '<div class="empty-state compact"><span class="empty-icon">◷</span><h2>Nenhuma visita cadastrada</h2><p>Use o + em um dia do calendário para agendar o primeiro atendimento.</p></div>';
+    }
+    function renderVisits() {
+        if (!visitas.length) {
+            lista.innerHTML = '<div class="empty-state compact"><span class="empty-icon">◷</span><h2>Nenhuma visita nesta página</h2></div>';
             return;
         }
-        lista.innerHTML = listaVisitas.map((visita) => `
+        lista.innerHTML = visitas.map((visita) => `
       <article class="visit-card">
-        <p class="visit-date">${esc(fmtData.format(parseIso(visita.scheduledAt)))}</p>
+        <p class="visit-date">${esc(rotuloData(visita.scheduledAt))}</p>
         <h3>${esc(visita.clientName)}</h3>
         <p>${esc(visita.description)}</p>
         <p><strong>Materiais</strong><span>${esc(visita.materials || 'Não informado')}</span></p>
@@ -122,41 +114,55 @@ document.addEventListener('DOMContentLoaded', () => {
       </article>
     `).join('');
     }
-    document.getElementById('hoje-button').addEventListener('click', () => {
-        state.year = hoje.getFullYear();
-        state.month = hoje.getMonth();
-        render();
-    });
-    document.getElementById('prev-month').addEventListener('click', () => {
-        state.month -= 1;
-        if (state.month < 0) {
-            state.month = 11;
-            state.year -= 1;
-        }
-        render();
-    });
-    document.getElementById('next-month').addEventListener('click', () => {
-        state.month += 1;
-        if (state.month > 11) {
-            state.month = 0;
-            state.year += 1;
-        }
-        render();
-    });
-    document.getElementById('limpar-filtro').addEventListener('click', () => {
-        busca.value = '';
-        state.filtro = '';
-        render();
-    });
-    busca.addEventListener('input', () => {
-        state.filtro = busca.value.trim();
-        render();
+    function mudarMes(value) {
+        const url = new URL(window.location.href);
+        url.pathname = '/calendario';
+        url.searchParams.set('mes', value);
+        url.searchParams.delete('apos');
+        window.location.assign(url);
+    }
+    const mesVizinho = (offset) => iso(new Date(year, month - 1 + offset, 1)).slice(0, 7);
+    document.getElementById('hoje-button').addEventListener('click', () => mudarMes(payload.currentMonth));
+    document.getElementById('prev-month').addEventListener('click', () => mudarMes(mesVizinho(-1)));
+    document.getElementById('next-month').addEventListener('click', () => mudarMes(mesVizinho(1)));
+
+    let clientSearch;
+    let searchTimer;
+    campoCliente.addEventListener('input', () => {
+        clearTimeout(searchTimer);
+        clientSearch?.abort();
+        const query = campoCliente.value.trim();
+        const matches = [...opcoesClientes.options].filter(option => option.value === query);
+        clienteId.value = matches.length === 1 ? matches[0].dataset.clientId : '';
+        if (clienteId.value || query.length < 2)
+            return;
+        searchTimer = setTimeout(async () => {
+            const request = new AbortController();
+            clientSearch = request;
+            try {
+                const response = await fetch('/calendario/clientes?' + new URLSearchParams({ busca: query }), { signal: request.signal });
+                if (!response.ok || campoCliente.value.trim() !== query)
+                    return;
+                const { clients } = await response.json();
+                if (campoCliente.value.trim() !== query)
+                    return;
+                opcoesClientes.replaceChildren(...clients.map(client => {
+                    const option = document.createElement('option');
+                    option.value = client.label;
+                    option.label = client.cnpj || client.label;
+                    option.dataset.clientId = client.id;
+                    return option;
+                }));
+            } catch {
+                // O servidor também valida a escolha ao salvar.
+            }
+        }, 200);
     });
     grid.addEventListener('click', (event) => {
         const botao = event.target.closest('button.agendar-dia');
         if (!botao)
             return;
-        abrirModal(new Date(state.year, state.month, Number(botao.dataset.day)));
+        abrirModal(new Date(year, month - 1, Number(botao.dataset.day)));
     });
     lista.addEventListener('click', (event) => {
         const botao = event.target.closest('button.editar-visita');
@@ -175,13 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (event.key === 'Escape' && !modal.hidden)
             fecharModal();
     });
-    const rascunho = campoData.value;
-    if (rascunho) {
-        const data = parseIso(rascunho);
-        if (!Number.isNaN(data.getTime())) {
-            state.year = data.getFullYear();
-            state.month = data.getMonth();
-        }
-    }
-    render();
+    if (!payload.undated)
+        renderMonth();
+    renderVisits();
 });

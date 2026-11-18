@@ -1,56 +1,245 @@
 const User = require('../models/User');
 const auth = require('../middleware/auth');
-const render = (res, error = '', status = 200) => res.status(status).render('pages/login', { title: 'Entrar', error });
-exports.loginPage = (req, res) => req.user ? res.redirect('/dashboard') : render(res);
+const input = require('../services/accountValidation');
+const passwordPolicy = require('../services/passwordPolicy');
+const throttle = require('../services/loginThrottle');
+const { isUuid } = require('../utils/pagination');
+
+const usersPath = '/configuracoes/usuarios';
+const accountPath = '/conta';
+const setupPath = '/acesso/definir-senha';
+const invalidLink = 'O link expirou ou já foi usado. Solicite um novo link ao administrador.';
+const invalidCredentials = 'E-mail ou senha inválidos.';
+const retryMessage = 'Aguarde antes de tentar novamente.';
+const date = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Sao_Paulo' });
+
+function safeNext(value) {
+    if (typeof value !== 'string' || value.length > 1000 || !/^\/(?![\\/])/.test(value) ||
+        /[\x00-\x1f\x7f\\]/.test(value))
+        return '/dashboard';
+    return value;
+}
+
+function renderLogin(res, { next, error = '', status = 200 }) {
+    return res.status(status).render('pages/login', { title: 'Entrar', next, error });
+}
+
+function limitResponse(req, res, kind, seconds) {
+    throttle.report(req, kind + '_throttled');
+    res.set('Retry-After', String(seconds));
+    return { error: retryMessage, status: 429 };
+}
+
+exports.loginPage = (req, res) => req.user ? res.redirect('/dashboard') :
+    renderLogin(res, { next: safeNext(req.query.next) });
+
 exports.login = async (req, res) => {
-    const email = String(req.body.email || '').trim().toLowerCase();
-    const password = String(req.body.password || '');
-    if (email.length > 254 || password.length > 200)
-        return render(res, 'Credenciais inválidas.', 401);
-    const user = await User.byEmail(email);
-    if (!user || !user.active || !await User.verifyPassword(password, user.password_hash))
-        return render(res, 'E-mail ou senha inválidos.', 401);
-    await auth.create(req, res, user);
-    return res.redirect('/dashboard');
+    if (req.user) return res.redirect(303, '/dashboard');
+    const next = safeNext(req.body?.next);
+    const email = input.loginAddress(req.body?.email);
+    const password = req.body?.password;
+    const seconds = await throttle.start(req, 'login', email || '');
+    if (seconds) return renderLogin(res, { next, ...limitResponse(req, res, 'login', seconds) });
+    if (!email || !passwordPolicy.input(password)) {
+        throttle.report(req, 'login_failed');
+        return renderLogin(res, { next, error: invalidCredentials, status: 401 });
+    }
+
+    const account = await User.byEmail(email);
+    const valid = await User.verifyPassword(password, account?.active ? account.password_hash : null);
+    if (!valid || !await auth.create(req, res, account)) {
+        throttle.report(req, 'login_failed');
+        return renderLogin(res, { next, error: invalidCredentials, status: 401 });
+    }
+    await throttle.success('login', email);
+    return res.redirect(303, next);
 };
-exports.logout = async (req, res) => { await auth.destroy(req, res); res.redirect('/'); };
-exports.users = async (req, res) => res.render('users/index', { title: 'Usuários do sistema', users: await User.all(), error: null });
+
+exports.logout = async (req, res) => {
+    await auth.destroy(req, res);
+    return res.redirect(303, '/');
+};
+
+async function reauthenticate(req, res) {
+    const seconds = await throttle.start(req, 'reauth', req.user.id);
+    if (seconds) return limitResponse(req, res, 'reauth', seconds);
+
+    const password = req.body?.currentPassword;
+    if (passwordPolicy.input(password)) {
+        const account = await User.activeById(req.user.id);
+        if (await User.verifyPassword(password, account?.password_hash)) {
+            await throttle.success('reauth', req.user.id);
+            return { account };
+        }
+    }
+    throttle.report(req, 'reauth_failed');
+    return { error: 'Confirme a ação com sua senha atual.', status: 422 };
+}
+
+async function renderUsers(req, res, { error = null, status = 200, link = null } = {}) {
+    const page = await User.page(req.query.apos);
+    return res.status(status).render('users/index', { title: 'Usuários do sistema', users: page.items, page, error, link });
+}
+
+function renderLink(req, res, origin, token, email) {
+    const url = new URL(setupPath, origin);
+    url.searchParams.set('token', token);
+    res.set('Referrer-Policy', 'no-referrer');
+    return renderUsers(req, res, { link: { url: url.href, email } });
+}
+
+exports.users = (req, res) => renderUsers(req, res);
+
 exports.createUser = async (req, res) => {
-    const { name, email, password, role } = req.body;
-    const fail = async (message, status = 422) => res.status(status).render('users/index', { title: 'Usuários do sistema', users: await User.all(), error: message });
-    if (typeof name !== 'string' || name.trim().length < 2 || name.length > 120 || typeof email !== 'string' || !/^\S+@\S+\.\S+$/.test(email) || email.length > 254 || typeof password !== 'string' || password.length < 12 || password.length > 200 || !['admin', 'analista'].includes(role))
-        return fail('Confira nome, e-mail, perfil e senha (mínimo 12 caracteres).');
+    const result = await reauthenticate(req, res);
+    if (result.error) return renderUsers(req, res, result);
+    const form = await input.account(req.body);
+    if (!form) return renderUsers(req, res, { error: 'Confira nome, e-mail e perfil.', status: 422 });
+    const origin = auth.linkOrigin(req);
+    if (!origin)
+        return renderUsers(req, res, { error: 'Configure o endereço público do aplicativo para gerar links.', status: 503 });
+
     try {
-        await User.create({ name: name.trim(), email: email.trim(), password, role });
-        res.redirect('/configuracoes/usuarios');
-    }
-    catch (e) {
-        if (e.code === '23505')
-            return fail('E-mail já cadastrado.');
-        throw e;
+        const token = await User.createInvited(form, result.account);
+        if (!token)
+            return renderUsers(req, res, { error: 'Confirme seu acesso de administrador novamente.', status: 409 });
+        return renderLink(req, res, origin, token, form.email);
+    } catch (error) {
+        if (error.code === '23505')
+            return renderUsers(req, res, { error: 'Não foi possível criar a conta com os dados informados.', status: 422 });
+        throw error;
     }
 };
+
 exports.updateUser = async (req, res) => {
-    const { name, email, role, password } = req.body;
-    const active = req.body.active === 'on';
-    const fail = async (msg) => res.status(422).render('users/index', { title: 'Usuários do sistema', users: await User.all(), error: msg });
-    if (typeof name !== 'string' || name.trim().length < 2 || name.length > 120 || typeof email !== 'string' || !/^\S+@\S+\.\S+$/.test(email) || !['admin', 'analista'].includes(role) || password && password.length < 12)
-        return fail('Dados inválidos.');
-    if (req.params.id === req.user.id && (!active || role !== 'admin'))
-        return fail('Você não pode retirar seu próprio acesso de administrador.');
+    const result = await reauthenticate(req, res);
+    if (result.error) return renderUsers(req, res, result);
+    const id = req.params.id;
+    const form = await input.account(req.body);
+    const active = req.body?.active === 'on';
+    if (!form || !isUuid(id))
+        return renderUsers(req, res, { error: 'Confira nome, e-mail e perfil.', status: 422 });
+    const own = id.toLowerCase() === req.user.id;
+    if (own && (!active || form.role !== 'admin')) {
+        return renderUsers(req, res, { error: 'Você não pode retirar seu próprio acesso de administrador.', status: 422 });
+    }
+
     try {
-        await User.update(req.params.id, { name: name.trim(), email: email.trim(), role, active, password });
-        res.redirect('/configuracoes/usuarios');
+        if (!await User.update(id, { ...form, active }, own ? req.session.hash : null, result.account))
+            return renderUsers(req, res, { error: 'A conta não está disponível.', status: 404 });
+    } catch (error) {
+        if (error.code === '23505')
+            return renderUsers(req, res, { error: 'Não foi possível atualizar a conta com os dados informados.', status: 422 });
+        throw error;
     }
-    catch (e) {
-        if (e.code === '23505')
-            return fail('E-mail já cadastrado.');
-        throw e;
-    }
+    await req.setFlash({ type: 'success', message: 'Conta atualizada.' });
+    return res.redirect(303, usersPath);
 };
+
 exports.removeUser = async (req, res) => {
-    if (req.params.id === req.user.id)
-        return res.status(400).send('Não é possível excluir a própria conta.');
-    await User.remove(req.params.id);
-    res.redirect('/configuracoes/usuarios');
+    const result = await reauthenticate(req, res);
+    if (result.error) return renderUsers(req, res, result);
+    const id = req.params.id;
+    if (!isUuid(id) || id.toLowerCase() === req.user.id)
+        return renderUsers(req, res, { error: 'Selecione outra conta para excluir.', status: 422 });
+    if (!await User.remove(id, result.account))
+        return renderUsers(req, res, { error: 'A conta não está disponível.', status: 404 });
+    await req.setFlash({ type: 'success', message: 'Conta excluída.' });
+    return res.redirect(303, usersPath);
+};
+
+exports.recoverUser = async (req, res) => {
+    const result = await reauthenticate(req, res);
+    if (result.error) return renderUsers(req, res, result);
+
+    const id = req.params.id;
+    if (!isUuid(id) || id.toLowerCase() === req.user.id)
+        return renderUsers(req, res, { error: 'Selecione outra conta para recuperar.', status: 422 });
+    const origin = auth.linkOrigin(req);
+    if (!origin)
+        return renderUsers(req, res, { error: 'Configure o endereço público do aplicativo para gerar links.', status: 503 });
+    const issued = await User.issuePasswordLink(id, result.account);
+    if (!issued)
+        return renderUsers(req, res, { error: 'A conta não está disponível.', status: 404 });
+    return renderLink(req, res, origin, issued.token, issued.email);
+};
+
+async function renderAccount(req, res, { error = null, status = 200 } = {}) {
+    const sessions = (await auth.list(req)).map(session => ({
+        ...session,
+        current: session.id === req.session.id,
+        created: date.format(session.created_at),
+        lastSeen: date.format(session.last_seen_at)
+    }));
+    return res.status(status).render('users/account', { title: 'Minha conta', sessions, error });
+}
+
+exports.account = (req, res) => renderAccount(req, res);
+
+async function validatePassword(req, account) {
+    const { password, confirmPassword } = req.body || {};
+    if (password !== confirmPassword)
+        return { error: 'Confirme a mesma senha nos dois campos.', status: 422 };
+    const issue = await passwordPolicy.validate(password, account);
+    return issue && { error: issue.message, status: issue.status || 422 };
+}
+
+exports.changePassword = async (req, res) => {
+    const result = await reauthenticate(req, res);
+    if (result.error) return renderAccount(req, res, result);
+    if (req.body.password === req.body.currentPassword)
+        return renderAccount(req, res, { error: 'Escolha uma senha diferente da atual.', status: 422 });
+    const issue = await validatePassword(req, result.account);
+    if (issue) return renderAccount(req, res, issue);
+    if (!await User.changePassword(result.account, req.body.password, req.session.hash))
+        return renderAccount(req, res, { error: 'A conta foi alterada. Entre novamente para trocar a senha.', status: 409 });
+    await req.setFlash({ type: 'success', message: 'Senha alterada e outras sessões encerradas.' });
+    return res.redirect(303, accountPath);
+};
+
+exports.endSession = async (req, res) => {
+    const id = req.params.id;
+    if (!isUuid(id))
+        return renderAccount(req, res, { error: 'Sessão inválida.', status: 422 });
+    if (id.toLowerCase() === req.session.id) return exports.logout(req, res);
+    await auth.destroyById(req, id);
+    return res.redirect(303, accountPath);
+};
+
+exports.endAllSessions = async (req, res) => {
+    await auth.destroyAll(req, res);
+    return res.redirect(303, '/login');
+};
+
+function renderSetup(res, { token = null, error = null, status = 200 } = {}) {
+    return res.status(status).render('users/password', { title: 'Definir senha', token, error });
+}
+
+async function findPasswordLink(token) {
+    if (typeof token !== 'string' || !/^[a-f0-9]{64}$/.test(token)) return null;
+    return User.passwordLinkAccount(token);
+}
+
+exports.setupPage = async (req, res) => {
+    if (req.user)
+        return renderSetup(res, { error: 'Abra o link em uma janela privada ou saia da sua conta antes de continuar.' });
+    const token = req.query.token;
+    if (!await findPasswordLink(token)) return renderSetup(res, { error: invalidLink, status: 410 });
+    return renderSetup(res, { token });
+};
+
+exports.setupPassword = async (req, res) => {
+    if (req.user) return res.redirect(303, accountPath);
+    const token = req.body?.token;
+    const account = await findPasswordLink(token);
+    if (!account) return renderSetup(res, { error: invalidLink, status: 410 });
+
+    const seconds = await throttle.start(req, 'password_setup', account.id);
+    if (seconds) return renderSetup(res, { token, ...limitResponse(req, res, 'password_setup', seconds) });
+    const issue = await validatePassword(req, account);
+    if (issue) return renderSetup(res, { token, ...issue });
+    if (!await User.consumePasswordLink(token, account, req.body.password))
+        return renderSetup(res, { error: invalidLink, status: 410 });
+    await throttle.success('password_setup', account.id);
+    return res.redirect(303, '/login');
 };

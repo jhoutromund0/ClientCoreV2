@@ -9,5 +9,6 @@ router.get('/usuarios', wrap(users.users));
 router.post('/usuarios', wrap(users.createUser));
 router.post('/usuarios/:id', wrap(users.updateUser));
 router.post('/usuarios/:id/excluir', wrap(users.removeUser));
+router.post('/usuarios/:id/recuperar', wrap(users.recoverUser));
 
 module.exports = router;

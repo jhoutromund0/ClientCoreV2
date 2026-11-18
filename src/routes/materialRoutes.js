@@ -2,12 +2,13 @@ const wrap = require('../middleware/asyncHandler');
 const router = require('express').Router();
 const { body } = require('express-validator');
 const materials = require('../controllers/materialController');
+const scalar = value => typeof value === 'string' || typeof value === 'number';
 const validateMaterial = [
     body('name').isString().withMessage('Informe o nome do material.').bail().trim().notEmpty().withMessage('Informe o nome do material.').isLength({ max: 120 }).withMessage('O nome deve ter até 120 caracteres.'),
-    body('measureType').isIn(['quantidade', 'comprimento']).withMessage('Selecione quantidade ou comprimento.'),
-    body('measure').isFloat({ gt: 0, max: 1000000 }).withMessage('Informe uma medida maior que zero.'),
-    body('unit').optional({ checkFalsy: true }).isIn(['m', 'kg', 'un']).withMessage('Selecione metro ou kg.'),
-    body('unitValue').isFloat({ min: 0, max: 100000000 }).withMessage('Informe um valor unitário válido.')
+    body('measureType').isString().bail().isIn(['quantidade', 'comprimento']).withMessage('Selecione quantidade ou comprimento.'),
+    body('measure').custom(scalar).bail().isFloat({ gt: 0, max: 1000000 }).withMessage('Informe uma medida maior que zero.'),
+    body('unit').optional({ values: 'falsy' }).isString().bail().isIn(['m', 'kg', 'un']).withMessage('Selecione metro ou kg.'),
+    body('unitValue').custom(scalar).bail().isFloat({ min: 0, max: 100000000 }).withMessage('Informe um valor unitário válido.')
 ];
 router.get('/', wrap(materials.index));
 router.post('/', validateMaterial, wrap(materials.create));

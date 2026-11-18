@@ -9,9 +9,9 @@
   </div>
 
   <div class="stats-grid" id="material-stats">
-    <div class="stat-card"><span>Itens cadastrados</span><strong id="total-itens"><%= materials.length %></strong><small>Itens visíveis na lista</small></div>
-    <div class="stat-card"><span>Medida total</span><strong class="stat-text" id="total-medida">0</strong><small>Soma das quantidades e medidas</small></div>
-    <div class="stat-card"><span>Valor em estoque</span><strong class="stat-text" id="valor-total">R$ 0,00</strong><small>Medida × valor unitário</small></div>
+    <div class="stat-card"><span>Itens cadastrados</span><strong><%= Number(summary.count).toLocaleString('pt-BR') %></strong><small>Considerando a busca atual</small></div>
+    <div class="stat-card"><span>Medida total</span><strong class="stat-text"><%= Number(summary.measure).toLocaleString('pt-BR', { maximumFractionDigits: 2 }) %></strong><small>Soma das quantidades e medidas</small></div>
+    <div class="stat-card"><span>Valor em estoque</span><strong class="stat-text"><%= Number(summary.value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) %></strong><small>Medida × valor unitário</small></div>
   </div>
 
   <div class="split-layout">
@@ -60,19 +60,24 @@
           <h2>Lista de materiais</h2>
           <p class="muted">Nome, medida, valor e total de cada item.</p>
         </div>
-        <label class="search-field">Buscar material
-          <input id="buscar-material" type="search" placeholder="Nome ou tipo">
-        </label>
+        <form method="get" action="/materiais">
+          <label class="search-field">Buscar material
+            <input id="buscar-material" name="busca" type="search" placeholder="Nome ou tipo" value="<%= search %>" maxlength="120">
+          </label>
+          <button class="button button-ghost" type="submit">Buscar</button>
+          <% if (search) { %><a class="text-button" href="/materiais">Limpar</a><% } %>
+        </form>
       </div>
       <div class="table-wrap">
-        <table <%= materials.length ? '' : 'hidden' %>>
+        <% if (materials.length) { %>
+        <table>
           <caption class="sr-only">Materiais cadastrados, valores e ações disponíveis</caption>
           <thead>
             <tr><th>Nome</th><th>Tipo</th><th>Medida</th><th>Valor</th><th>Total</th><th>Ações</th></tr>
           </thead>
           <tbody id="materiais-lista">
             <% materials.forEach(item => { %>
-              <tr data-name="<%= item.name %>" data-type="<%= item.measureType %>" data-measure="<%= item.measure %>" data-value="<%= item.unitValue %>">
+              <tr>
                 <td><strong><%= item.name %></strong></td>
                 <td><%= item.measureType === 'comprimento' ? 'Comprimento' : 'Quantidade' %></td>
                 <td class="measure-cell"><%= Number(item.measure).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %> <%= item.measureType === 'comprimento' ? item.unit : 'un' %></td>
@@ -89,12 +94,15 @@
             <% }) %>
           </tbody>
         </table>
-        <div id="lista-vazia" class="empty-state compact" <%= materials.length ? 'hidden' : '' %>>
+        <% } else { %>
+        <div class="empty-state compact">
           <span class="empty-icon">▤</span>
           <h2>Nenhum material encontrado</h2>
-          <p>Cadastre um novo item para iniciar o controle.</p>
+          <p><%= search ? 'Nenhum item corresponde à busca.' : 'Cadastre um novo item para iniciar o controle.' %></p>
         </div>
+        <% } %>
       </div>
+      <%- include('../partials/pagination', { page, path: '/materiais', params: search ? { busca: search } : {} }) %>
     </section>
   </div>
   <p class="storage-note">ⓘ Dados armazenados no PostgreSQL.</p>

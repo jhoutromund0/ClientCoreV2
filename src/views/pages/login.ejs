@@ -9,30 +9,28 @@
     <p class="muted">
       Acesse sua área de trabalho.
     </p>
-    <% if(error){ %>
+    <% if (error) { %>
     <p class="flash error" role="alert">
       <%= error %>
     </p>
     <% } %>
     <form action="/login" method="post" class="form-stack">
-      <% if (typeof csrfToken !== "undefined" && csrfToken) { %>
-      <input type="hidden" name="_csrf" value="<%= csrfToken %>
-      ">
-      <% } %>
+      <%- include('../partials/csrf-field') %>
+      <input type="hidden" name="next" value="<%= next %>">
       <label>
         E-mail
-        <input type="email" name="email" required autocomplete="email">
+        <input type="email" name="email" maxlength="254" required autocomplete="username">
       </label>
       <label>
         Senha
-        <input type="password" name="password" required autocomplete="current-password">
+        <input type="password" name="password" maxlength="200" required autocomplete="current-password">
       </label>
       <button class="button full" type="submit">
         Entrar →
       </button>
     </form>
     <p class="form-note">
-      Solicite seu acesso ao administrador do sistema.
+      Solicite seu acesso ou um link de recuperação ao administrador do sistema.
     </p>
   </section>
 </main>

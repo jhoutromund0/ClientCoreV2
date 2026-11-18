@@ -19,10 +19,11 @@ async function renderForm(res, clientData, errors = []) {
     });
 }
 exports.index = async (req, res) => {
-    const [clients, settings] = await Promise.all([Client.all(), TransportSettings.get()]);
+    const [page, settings] = await Promise.all([Client.page(req.query.apos), TransportSettings.get()]);
     res.render('clients/index', {
         title: 'Clientes',
-        clients: clients.map(client => ({ ...client, tripDisplay: clientTravelService.describe(client, settings) }))
+        page: { ...page, after: req.query.apos },
+        clients: page.items.map(client => ({ ...client, tripDisplay: clientTravelService.describe(client, settings) }))
     });
 };
 exports.createForm = async (req, res) => {
@@ -32,8 +33,14 @@ exports.create = async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty())
         return renderForm(res, { ...emptyClient, ...req.body, id: undefined }, errors.array());
-    await Client.create(req.body);
-    req.app.locals.flash = { type: 'success', message: 'Cliente cadastrado com sucesso.' };
+    try {
+        await Client.create(req.body);
+    } catch (error) {
+        if (error.code !== '23505')
+            throw error;
+        return renderForm(res, { ...emptyClient, ...req.body, id: undefined }, [duplicateIdentity(error)]);
+    }
+    await req.setFlash({ type: 'success', message: 'Cliente cadastrado com sucesso.' });
     res.redirect('/clientes');
 };
 exports.editForm = async (req, res) => {
@@ -49,20 +56,36 @@ exports.update = async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty())
         return renderForm(res, { ...client, ...req.body, id: client.id, travel: client.travel }, errors.array());
-    await Client.update(client.id, req.body);
-    req.app.locals.flash = { type: 'success', message: 'Cliente atualizado com sucesso.' };
+    try {
+        if (!await Client.update(client.id, req.body))
+            return notFound(res);
+    } catch (error) {
+        if (error.code !== '23505')
+            throw error;
+        return renderForm(res, { ...client, ...req.body, id: client.id, travel: client.travel }, [duplicateIdentity(error)]);
+    }
+    await req.setFlash({ type: 'success', message: 'Cliente atualizado com sucesso.' });
     res.redirect('/clientes');
 };
 exports.remove = async (req, res) => {
-    if (!await Client.delete(req.params.id))
-        return notFound(res);
-    req.app.locals.flash = { type: 'success', message: 'Cliente excluído com sucesso.' };
+    try {
+        if (!await Client.delete(req.params.id))
+            return notFound(res);
+    } catch (error) {
+        if (error.code !== '23503' && error.code !== '23001')
+            throw error;
+        return res.status(409).render('pages/error', {
+            title: 'Cliente vinculado a visitas', code: 409,
+            message: 'Transfira ou exclua as visitas vinculadas antes de excluir este cliente.'
+        });
+    }
+    await req.setFlash({ type: 'success', message: 'Cliente excluído com sucesso.' });
     res.redirect('/clientes');
 };
 // Consulta de CNPJ (CNPJá). Feita pelo servidor para respeitar o CSP e o limite de 5 consultas/min do provedor.
 exports.lookupCnpj = async (req, res, next) => {
     try {
-        const data = await cnpjService.lookup(req.params.cnpj);
+        const data = await cnpjService.lookup(req.params.cnpj, req.user.id);
         res.json({ data });
     }
     catch (err) {
@@ -73,3 +96,8 @@ exports.lookupCnpj = async (req, res, next) => {
         res.status(err.status).json({ error: err.message });
     }
 };
+
+function duplicateIdentity(error) {
+    const field = error.constraint === 'clients_cnpj_unique' ? 'CNPJ' : 'e-mail';
+    return { msg: `Já existe um cliente cadastrado com esse ${field}.` };
+}

@@ -8,15 +8,13 @@
       <%= title %>
       | Client Core
     </title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/css/app.css?v=3">
+    <link rel="stylesheet" href="/css/app.css?v=4">
   </head>
   <body>
+    <a class="skip-link" href="#main-content">Pular para o conteúdo</a>
     <%- include('../partials/header') %>
     <% if (flash) { %>
-    <div class="flash <%= flash.type %>
-      " role="status">
+    <div class="flash <%= flash.type %>" role="status">
       <%= flash.message %>
     </div>
     <% } %>

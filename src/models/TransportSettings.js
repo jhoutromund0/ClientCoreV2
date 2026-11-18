@@ -1,5 +1,5 @@
 const { randomUUID } = require('node:crypto');
-const { query } = require('../config/database');
+const { query, write } = require('../config/database');
 
 const defaults = Object.freeze({
     originAddress: 'R. Heitor Lacerda Guedes, 1000 - Cidade Satélite Íris, Campinas - SP, 13059-581, Brazil',
@@ -14,7 +14,7 @@ async function get() {
 }
 
 async function save({ originAddress, rateCentsPerKm }) {
-    const { rows } = await query(`
+    const { rows } = await write(`
         INSERT INTO transport_settings (origin_address, rate_cents_per_km, revision)
         VALUES ($1, $2, $3)
         ON CONFLICT (id) DO UPDATE SET

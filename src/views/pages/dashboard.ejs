@@ -28,7 +28,7 @@ const materialPeak = Math.max(1, ...topMaterials.map((material) => material.visi
         <li>
           <span class="dashboard-day-label"><%= entry.label %></span>
           <strong><%= formatCount.format(entry.count) %></strong>
-          <span class="dashboard-activity-track" aria-hidden="true"><span style="height:<%= Math.round(entry.count / attendancePeak * 100) %>%"></span></span>
+          <span class="dashboard-activity-track" aria-hidden="true"><span data-bar-height="<%= Math.round(entry.count / attendancePeak * 100) %>"></span></span>
         </li>
         <% }) %>
       </ul>
@@ -76,7 +76,7 @@ const materialPeak = Math.max(1, ...topMaterials.map((material) => material.visi
             <strong><%= material.name %></strong>
             <span class="muted"><%= formatCount.format(material.visits) %> <%= material.visits === 1 ? 'atendimento' : 'atendimentos' %></span>
           </div>
-          <span class="dashboard-material-track" aria-hidden="true"><span style="width:<%= Math.round(material.visits / materialPeak * 100) %>%"></span></span>
+          <span class="dashboard-material-track" aria-hidden="true"><span data-bar-width="<%= Math.round(material.visits / materialPeak * 100) %>"></span></span>
         </li>
         <% }) %>
       </ol>

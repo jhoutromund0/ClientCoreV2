@@ -25,16 +25,23 @@ function notFound(res) {
     });
 }
 async function renderForm(res, visit, draft, errors = []) {
+    const [record, materials] = await Promise.all([FinancialRecord.find(visit.id), Material.catalog()]);
     return res.status(errors.length ? 422 : 200).render('finance/form', {
         title: 'Financeiro do atendimento',
         visit, draft, errors, statuses, units, origins,
-        hasRecord: Boolean(await FinancialRecord.find(visit.id)),
-        materials: await Material.all()
+        hasRecord: Boolean(record),
+        materials
     });
 }
 exports.index = async (req, res) => {
-    const entries = await Promise.all((await Visit.all()).map(async (visit) => ({ visit, record: await FinancialRecord.find(visit.id) })));
-    res.render('finance/index', { title: 'Financeiro', entries, statuses, formatMoney });
+    const page = await Visit.financePage(req.query.apos);
+    const entries = page.items.map(({ visit, record }) => ({ visit, record: FinancialRecord.format(record) }));
+    res.render('finance/index', { title: 'Financeiro', entries, page: { ...page, after: req.query.apos }, statuses, formatMoney });
+};
+exports.catalog = async (req, res) => {
+    const search = typeof req.query.busca === 'string' ? req.query.busca.trim().slice(0, 120) : '';
+    const materials = (await Material.catalog(search)).map(({ id, name, unit, unitValue }) => ({ id, name, unit, unitValue }));
+    res.json({ materials });
 };
 exports.edit = async (req, res) => {
     const visit = await Visit.find(req.params.visitId);
@@ -103,12 +110,19 @@ exports.save = async (req, res) => {
         errors.push('O valor recebido deve ser menor ou igual ao total a cobrar.');
     if (errors.length)
         return renderForm(res, visit, draft, errors);
-    await FinancialRecord.save(visit.id, { labor, received, status, items, ...summary });
-    req.app.locals.flash = { type: 'success', message: 'Lançamento financeiro salvo.' };
+    try {
+        await FinancialRecord.save(visit.id, { labor, received, status, items, ...summary });
+    } catch (error) {
+        if (error.code === '23503')
+            return notFound(res);
+        throw error;
+    }
+    await req.setFlash({ type: 'success', message: 'Lançamento financeiro salvo.' });
     res.redirect('/financeiro');
 };
 exports.remove = async (req, res) => {
-    await FinancialRecord.delete(req.params.visitId);
-    req.app.locals.flash = { type: 'success', message: 'Lançamento financeiro excluído.' };
+    if (!await FinancialRecord.delete(req.params.visitId))
+        return notFound(res);
+    await req.setFlash({ type: 'success', message: 'Lançamento financeiro excluído.' });
     res.redirect('/financeiro');
 };

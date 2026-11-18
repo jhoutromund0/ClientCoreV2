@@ -1,4 +1,9 @@
 document.addEventListener('DOMContentLoaded', () => {
+    for (const bar of document.querySelectorAll('[data-bar-height]'))
+        bar.style.height = `${Number(bar.dataset.barHeight)}%`;
+    for (const bar of document.querySelectorAll('[data-bar-width]'))
+        bar.style.width = `${Number(bar.dataset.barWidth)}%`;
+
     const toggle = document.querySelector('.menu-toggle');
     const nav = document.querySelector('.main-nav');
     if (toggle && nav) {

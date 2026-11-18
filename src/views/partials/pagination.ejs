@@ -1,0 +1,13 @@
+<%
+  const query = new URLSearchParams(typeof params === 'object' && params ? params : {});
+  const search = query.toString();
+  const firstUrl = search ? path + '?' + search : path;
+  if (page.next) query.set('apos', page.next);
+  const after = typeof page.after === 'string' && page.after;
+%>
+<% if (after || page.next) { %>
+  <nav class="form-actions" aria-label="Paginação">
+    <% if (after) { %><a class="button button-ghost" href="<%= firstUrl %>">Primeira página</a><% } %>
+    <% if (page.next) { %><a class="button button-ghost" href="<%= path + '?' + query.toString() %>">Próxima página →</a><% } %>
+  </nav>
+<% } %>

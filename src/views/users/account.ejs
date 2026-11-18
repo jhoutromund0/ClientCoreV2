@@ -1,0 +1,54 @@
+<main id="main-content" class="shell inner-page">
+  <div class="page-title-row">
+    <div>
+      <h1>Minha conta</h1>
+      <p class="muted"><%= user.name %> · <%= user.email %></p>
+    </div>
+  </div>
+
+  <% if (error) { %>
+  <p class="validation-errors" role="alert"><%= error %></p>
+  <% } %>
+
+  <div class="split-layout">
+    <form class="panel-form" method="post" action="/conta/senha" aria-labelledby="password-heading">
+      <%- include('../partials/csrf-field') %>
+      <h2 id="password-heading">Alterar senha</h2>
+      <p class="muted">A alteração encerra as outras sessões da sua conta.</p>
+      <div class="form-grid one-col">
+        <label>Senha atual
+          <input name="currentPassword" type="password" autocomplete="current-password" maxlength="200" required>
+        </label>
+        <%- include('new-password-fields') %>
+      </div>
+      <div class="form-actions">
+        <button class="button" type="submit">Alterar senha</button>
+      </div>
+    </form>
+
+    <section class="panel" aria-labelledby="sessions-heading">
+      <div class="panel-head">
+        <h2 id="sessions-heading">Sessões ativas</h2>
+      </div>
+      <ul class="stack">
+        <% sessions.forEach(session => { %>
+        <li>
+          <strong><%= session.current ? 'Sessão atual' : 'Outra sessão' %></strong>
+          <div class="muted"><%= session.user_agent || 'Navegador não identificado' %></div>
+          <div class="muted">Início <%= session.created %> · Última atividade <%= session.lastSeen %><%= session.ip ? ' · IP ' + session.ip : '' %></div>
+          <% if (!session.current) { %>
+          <form method="post" action="/conta/sessoes/<%= session.id %>/encerrar">
+            <%- include('../partials/csrf-field') %>
+            <button class="button button-ghost button-small" type="submit">Encerrar sessão</button>
+          </form>
+          <% } %>
+        </li>
+        <% }) %>
+      </ul>
+      <form method="post" action="/conta/sessoes/encerrar" data-confirm="Encerrar a sessão atual e todas as outras sessões?">
+        <%- include('../partials/csrf-field') %>
+        <button class="button button-ghost" type="submit">Encerrar todas as sessões</button>
+      </form>
+    </section>
+  </div>
+</main>

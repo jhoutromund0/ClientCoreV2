@@ -1,7 +1,5 @@
 const Visit = require('../models/Visit');
-const Client = require('../models/Client');
-const FinancialRecord = require('../models/FinancialRecord');
-const User = require('../models/User');
+const { query } = require('../config/database');
 const TransportSettings = require('../models/TransportSettings');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -150,19 +148,20 @@ async function load(requestedPeriod, now = new Date()) {
     const period = requestedPeriod === 'semana' ? 'semana' : 'mes';
     const barInterval = period === 'semana' ? 1 : 7;
     const dates = bounds(period, now);
-    const [visits, clients, financial, users, settings] = await Promise.all([
-        Visit.all(), Client.all(), FinancialRecord.all(), User.all(), TransportSettings.get()
+    const toIso = value => new Date(value).toISOString().slice(0, 10);
+    const [entries, users, settings] = await Promise.all([
+        Visit.dashboardData(toIso(Math.min(dates.start, dates.monthStart)), toIso(dates.end)),
+        query('SELECT name, email, role FROM users WHERE role = $1', ['analista']),
+        TransportSettings.get()
     ]);
-    const financialByVisit = new Map(financial.map((record) => [record.id, record]));
-    const clientsById = new Map(clients.map((client) => [client.id, client]));
-    const clientAliases = indexAliases(clients, (client) => [client.name, client.company]);
-    const userAliases = indexAliases(users, (user) => [user.name, user.email]);
+    const financialByVisit = new Map(entries.map(({ visit, record }) => [visit.id, record]));
+    const userAliases = indexAliases(users.rows, (user) => [user.name, user.email]);
     const bars = attendanceBars(dates.start, dates.end, barInterval);
     const appointments = [];
     const monthlyVisits = [];
     const totals = new Map();
 
-    for (const visit of visits) {
+    for (const { visit, client } of entries) {
         const day = visitDay(visit.scheduledAt);
         if (!Number.isFinite(day))
             continue;
@@ -180,7 +179,6 @@ async function load(requestedPeriod, now = new Date()) {
 
         if (day > dates.today || !technicians.people.size)
             continue;
-        const client = visit.clientId ? clientsById.get(visit.clientId) : clientAliases.get(key(visit.clientName));
         const meters = routeMeters(client, settings.originAddress);
         if (meters === null)
             continue;

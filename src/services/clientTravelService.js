@@ -127,6 +127,7 @@ async function refreshPendingTravel() {
 function start() {
     let stopped = false;
     let timer;
+    let running;
     async function tick() {
         let delay = 60000;
         try {
@@ -135,13 +136,17 @@ function start() {
             console.error('Não foi possível atualizar as rotas de clientes.', error.code || error.name);
         } finally {
             if (!stopped)
-                timer = setTimeout(tick, delay).unref();
+                timer = setTimeout(run, delay).unref();
         }
     }
-    timer = setTimeout(tick, 0).unref();
+    function run() {
+        running = tick();
+    }
+    timer = setTimeout(run, 0).unref();
     return () => {
         stopped = true;
         clearTimeout(timer);
+        return running;
     };
 }
 

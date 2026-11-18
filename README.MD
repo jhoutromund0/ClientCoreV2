@@ -78,11 +78,15 @@ A página inicial e a seção Sobre permanecem públicas. As funcionalidades int
 
 O cadastro de usuários é restrito aos administradores, não sendo permitido o registro público de novas contas.
 
+Administradores confirmam a própria senha para gerenciar contas. A tela de usuários gera links de convite e recuperação de uso único, válidos por uma hora. O administrador encaminha o link ao destinatário, que define sua própria senha.
+
+A sessão vence após 30 minutos de inatividade ou 12 horas desde o login, com até cinco sessões por conta. Clique no nome da conta no cabeçalho para consultar e encerrar sessões. A alteração do perfil ou da senha revoga os acessos anteriores conforme a operação.
+
 ## Deslocamento de clientes
 
 Em **Configurações**, o administrador pode alterar o endereço de partida da empresa e informar a tarifa de gasolina em reais por quilômetro. O sistema calcula a rota de carro para cada cliente com endereço, registra a distância da ida e o total de ida e volta, e multiplica cada distância pela tarifa. Alterações na configuração são aplicadas aos clientes existentes em segundo plano.
 
-1. Em um banco existente, execute `npm run db:migrate:transport` com `DATABASE_URL` configurada para criar a tabela de configuração. Para um banco novo, aplique `sql/schema.sql`.
+1. Execute `npm run db:migrate` com `DATABASE_URL` configurada para aplicar as migrações, incluindo a tabela de configuração de deslocamentos.
 2. Defina `NOMINATIM_BASE_URL` e `OSRM_BASE_URL` no ambiente do servidor com as URLs de instâncias próprias ou contratadas. O Nominatim deve oferecer `/search`. O OSRM deve oferecer `/table/v1/driving` e, se a matriz não incluir distâncias, `/route/v1/driving`. `OSM_USER_AGENT` permite identificar a instalação nos pedidos aos serviços.
 3. Inicie a aplicação e preencha a tarifa em **Configurações**. O endereço inicial já aparece no formulário.
 
@@ -96,7 +100,6 @@ O processamento de carteiras de clientes usa instâncias adequadas a consultas r
 - **CSS3:** estilização e identidade visual.
 - **JavaScript:** interatividade e funcionalidades.
 - **EJS:** renderização dinâmica das páginas.
-- **Tailwind CSS:** estilização e componentes visuais.
 
 ### Back-end
 
@@ -153,11 +156,12 @@ ClientCoreV2/
 │   └── server.js           # Inicialização do servidor
 ├── sql/                    # Scripts do PostgreSQL
 ├── script/                 # Scripts auxiliares
+├── test/                   # Testes automatizados
 ├── .env.example            # Exemplo de variáveis de ambiente
 ├── .gitignore
 ├── package.json
 ├── package-lock.json
-└── README.md
+└── README.MD
 ```
 
 ## 🎯 Público-Alvo

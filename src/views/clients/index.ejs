@@ -86,9 +86,7 @@
             <a href="/clientes/<%= client.id %>/editar">Editar
             </a>
             <form action="/clientes/<%= client.id %>/excluir" method="post" data-confirm="Excluir este cliente?">
-              <% if (typeof csrfToken !== 'undefined' && csrfToken) { %>
-              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-              <% } %>
+              <%- include('../partials/csrf-field') %>
               <button class="text-button danger" type="submit">
                 Excluir
               </button>
@@ -108,13 +106,14 @@
       Nenhum cliente cadastrado
     </h2>
     <p>
-      Comece adicionando a primeira empresa. Os registros desta versão são temporários.
+      Comece adicionando a primeira empresa.
     </p>
     <a class="button" href="/clientes/novo">
       Cadastrar primeiro cliente →
     </a>
   </section>
   <% } %>
+  <%- include('../partials/pagination', { page, path: '/clientes' }) %>
   <p class="storage-note">
     ⓘ Dados armazenados no PostgreSQL.
   </p>

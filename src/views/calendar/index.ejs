@@ -10,21 +10,20 @@
 
   <div class="split-layout calendar-layout">
     <aside class="stack">
-      <div class="stat-card"><span>Visitas agendadas</span><strong id="total-visitas">0</strong><small>Considerando o filtro atual</small></div>
-      <div class="stat-card"><span>Visitas este mês</span><strong id="total-visitas-mes">0</strong><small id="mes-resumo">No mês exibido</small></div>
-      <div class="panel filter-panel">
+      <div class="stat-card" <%= undated ? 'hidden' : '' %>><span>Visitas este mês</span><strong id="total-visitas-mes">0</strong><small>No mês exibido</small></div>
+      <form class="panel filter-panel" action="/calendario" method="get">
+        <input type="hidden" name="mes" value="<%= month %>">
         <h2>Filtrar por cliente</h2>
         <label>Nome do cliente
-          <input id="buscar-cliente" list="clientes-list" type="search" placeholder="Digite o nome do cliente" autocomplete="off">
+          <input name="cliente" type="search" placeholder="Digite o nome do cliente" value="<%= search %>" maxlength="160">
         </label>
-        <datalist id="clientes-list">
-          <% clients.forEach(client => { %><option value="<%= client.label %>"></option><% }) %>
-        </datalist>
-        <button class="button button-ghost full" id="limpar-filtro" type="button">Limpar filtro</button>
-      </div>
+        <button class="button button-ghost" type="submit">Filtrar</button>
+        <% if (search) { %><a class="text-button" href="/calendario?mes=<%= month %>">Limpar filtro</a><% } %>
+      </form>
+      <% if (hasUndated && !undated) { %><a class="text-button" href="/calendario?mes=sem-data">Visitas com data inválida</a><% } %>
     </aside>
 
-    <section class="panel">
+    <section class="panel" <%= undated ? 'hidden' : '' %>>
       <div class="panel-head">
         <div>
           <h2>Calendário</h2>
@@ -44,11 +43,12 @@
   <section class="panel visits-panel">
     <div class="panel-head">
       <div>
-        <h2>Todas as visitas agendadas</h2>
+        <h2><%= undated ? 'Visitas com data inválida' : 'Visitas do mês' %></h2>
         <p class="muted">Serviço, materiais e técnicos de cada atendimento.</p>
       </div>
     </div>
     <div id="visitas-do-dia" class="visit-grid"></div>
+    <%- include('../partials/pagination', { page, path: '/calendario', params: search ? { mes: month, cliente: search } : { mes: month } }) %>
   </section>
 
   <p class="storage-note">ⓘ Dados armazenados no PostgreSQL.</p>
@@ -70,11 +70,15 @@
       <%- include('../partials/csrf-field') %>
       <div class="form-grid one-col">
         <label>Data
-          <input id="visita-data" name="scheduledAt" type="date" value="<%= visitDraft ? (visitDraft.scheduledAt || '').slice(0, 10) : '' %>" required>
+          <input id="visita-data" name="scheduledAt" type="date" value="<%= typeof visitDraft?.scheduledAt === 'string' ? visitDraft.scheduledAt.slice(0, 10) : '' %>" required>
         </label>
         <label>Cliente
-          <input id="visita-cliente" name="clientName" list="clientes-list" value="<%= visitDraft ? visitDraft.clientName || '' : '' %>" placeholder="Digite o cliente" maxlength="160" required>
+          <input id="visita-cliente" name="clientName" list="clientes-list" value="<%= visitDraft ? visitDraft.clientName || '' : '' %>" placeholder="Busque um cliente cadastrado" maxlength="340" required autocomplete="off">
         </label>
+        <input id="visita-cliente-id" type="hidden" name="clientId" value="<%= visitDraft ? visitDraft.clientId || '' : '' %>">
+        <datalist id="clientes-list">
+          <% clients.forEach(client => { %><option value="<%= client.label %>" data-client-id="<%= client.id %>" label="<%= client.cnpj || client.label %>"></option><% }) %>
+        </datalist>
         <label>O que será realizado
           <select id="visita-tipo" name="description" required>
             <option value="">Selecione o serviço</option>
