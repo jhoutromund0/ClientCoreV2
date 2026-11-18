@@ -42,18 +42,23 @@ function formatMaterial(row) {
 
 async function getMany(visitIds, runner = database) {
     const ids = visitIds.filter(isUuid).map((id) => id.toLowerCase());
-    const resources = new Map(ids.map((id) => [id, { assignees: [], materials: [] }]));
+    const resources = new Map(ids.map((id) => [id, { assignees: [], materials: [], travelPayeeId: null }]));
     if (!ids.length)
         return resources;
     const [assignees, materials] = await Promise.all([
-        runner.query(`SELECT assignment.visit_id, users.id, users.name, users.role, users.active
+        runner.query(`SELECT assignment.visit_id, assignment.is_travel_payee, users.id, users.name, users.role, users.active,
+            users.mileage_rate_cents_per_km AS "mileageRateCentsPerKm"
             FROM visit_assignees AS assignment JOIN users ON users.id = assignment.user_id
             WHERE assignment.visit_id = ANY($1::uuid[]) ORDER BY users.name, users.id`, [ids]),
         runner.query(`SELECT * FROM visit_materials WHERE visit_id = ANY($1::uuid[])
             ORDER BY name_snapshot, material_id`, [ids])
     ]);
-    for (const { visit_id: visitId, ...user } of assignees.rows)
-        resources.get(visitId).assignees.push(user);
+    for (const { visit_id: visitId, is_travel_payee: isTravelPayee, ...user } of assignees.rows) {
+        const visit = resources.get(visitId);
+        visit.assignees.push(user);
+        if (isTravelPayee)
+            visit.travelPayeeId = user.id;
+    }
     for (const row of materials.rows)
         resources.get(row.visit_id).materials.push(formatMaterial(row));
     return resources;
@@ -61,7 +66,7 @@ async function getMany(visitIds, runner = database) {
 
 async function get(visitId, runner = database) {
     const resources = await getMany([visitId], runner);
-    return resources.get(String(visitId).toLowerCase()) || { assignees: [], materials: [] };
+    return resources.get(String(visitId).toLowerCase()) || { assignees: [], materials: [], travelPayeeId: null };
 }
 
 async function searchAssignees(search = '') {
@@ -93,7 +98,7 @@ async function findMaterials(ids) {
     return materialOptions(rows.map(({ id, data }) => Material.format({ ...data, id })));
 }
 
-async function saveAssignees(client, visitId, ids) {
+async function saveAssignees(client, visitId, ids, travelPayeeId) {
     if (ids.length) {
         const { rows } = await client.query(`SELECT users.id, users.name, users.active, assignment.id AS assignment_id
             FROM users
@@ -106,6 +111,15 @@ async function saveAssignees(client, visitId, ids) {
             ON CONFLICT (visit_id, user_id) DO NOTHING`, [visitId, ids]);
     }
     await client.query('DELETE FROM visit_assignees WHERE visit_id = $1 AND NOT (user_id = ANY($2::uuid[]))', [visitId, ids]);
+    if (travelPayeeId === undefined)
+        return;
+
+    await client.query(`UPDATE visit_assignees SET is_travel_payee = FALSE
+        WHERE visit_id = $1 AND is_travel_payee AND user_id IS DISTINCT FROM $2::uuid`, [visitId, travelPayeeId]);
+    if (travelPayeeId) {
+        await client.query(`UPDATE visit_assignees SET is_travel_payee = TRUE
+            WHERE visit_id = $1 AND user_id = $2 AND NOT is_travel_payee`, [visitId, travelPayeeId]);
+    }
 }
 
 function plannedMaterial(input, material, previous, consume) {
@@ -190,12 +204,14 @@ async function saveMaterials(client, visitId, inputs, ids, consume) {
     await client.query('DELETE FROM visit_materials WHERE visit_id = $1 AND NOT (material_id = ANY($2::uuid[]))', [visitId, ids]);
 }
 
-async function sync(client, visitId, { assigneeIds = [], materials = [], consume = false }) {
+async function sync(client, visitId, { assigneeIds = [], materials = [], consume = false, travelPayeeId }) {
     const ids = uniqueIds(assigneeIds, assigneeLimit, 'Selecione até 20 responsáveis diferentes.');
+    if (travelPayeeId != null && (!isUuid(travelPayeeId) || !ids.includes(travelPayeeId.toLowerCase())))
+        throw new ValidationError('Escolha um responsável da visita para receber o deslocamento.');
     const materialIds = uniqueIds(Array.isArray(materials) ? materials.map((line) => line?.materialId) : null,
         materialLimit, 'Selecione até 25 materiais diferentes.');
     // O atendimento deve estar bloqueado pela mesma transação que aplica os recursos.
-    await saveAssignees(client, visitId, ids);
+    await saveAssignees(client, visitId, ids, travelPayeeId?.toLowerCase() ?? travelPayeeId);
     await saveMaterials(client, visitId, materials, materialIds, consume);
 }
 

@@ -79,6 +79,28 @@
       <% if (visit?.technicians && !visit.assignees.length) { %><p class="muted">Responsáveis informados no registro anterior: <%= visit.technicians %></p><% } %>
     </section>
 
+    <section class="stack" aria-labelledby="visit-travel">
+      <h2 id="visit-travel">Deslocamento</h2>
+      <p class="muted form-hint" id="visit-km-hint">Preencha as duas distâncias para informar a quilometragem manualmente. Campos em branco usam a rota calculada.</p>
+      <div class="form-grid">
+        <label>Quilometragem de ida (km)
+          <input name="outboundKm" inputmode="decimal" maxlength="10" value="<%= draft.outboundKm %>" aria-describedby="visit-km-hint">
+        </label>
+        <label>Quilometragem total de ida e volta (km)
+          <input name="roundTripKm" inputmode="decimal" maxlength="10" value="<%= draft.roundTripKm %>" aria-describedby="visit-km-hint">
+        </label>
+      </div>
+      <label>Responsável que recebe o deslocamento
+        <select name="travelPayeeId" aria-describedby="visit-payee-hint">
+          <option value="">Automático</option>
+          <% assignees.filter(account => draft.assigneeIds.includes(account.id)).forEach(account => { %>
+          <option value="<%= account.id %>" <%= draft.travelPayeeId === account.id ? 'selected' : '' %>><%= account.name %></option>
+          <% }) %>
+        </select>
+      </label>
+      <p class="muted form-hint" id="visit-payee-hint">Selecione quem recebe quando houver mais de um responsável na visita.</p>
+    </section>
+
     <section class="stack" aria-labelledby="visit-materials">
       <h2 id="visit-materials">Materiais</h2>
       <p class="muted form-hint">A quantidade utilizada será baixada do estoque quando o consumo for confirmado na conclusão da visita.</p>

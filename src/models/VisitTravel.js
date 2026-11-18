@@ -6,6 +6,7 @@ const usableAddress = (column) => `CASE WHEN jsonb_typeof(${column}->'address') 
 const address = `COALESCE(${usableAddress('v.data')}, ${usableAddress('c.data')})`;
 const routable = `v.client_id IS NOT NULL AND clientcore_valid_day(v.scheduled_day)
     AND jsonb_typeof(v.data->'clientName') = 'string' AND btrim(v.data->>'clientName') <> ''
+    AND jsonb_typeof(v.data->'manualTravel') IS DISTINCT FROM 'object'
     AND COALESCE(v.data->>'status', 'agendada') <> 'cancelada'`;
 
 async function pendingTravel(revision, limit, cachedOrigin, run = query) {

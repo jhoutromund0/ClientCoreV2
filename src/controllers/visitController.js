@@ -10,6 +10,7 @@ const { isUuid } = require('../utils/pagination');
 const monthPattern = /^(?:[1-9]\d{3})-(?:0[1-9]|1[0-2])$/;
 const datePattern = /^([1-9]\d{3})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 const timePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+const kilometersPattern = /^(\d{1,6})(?:[.,](\d{1,3}))?$/;
 const saoPauloDate = new Intl.DateTimeFormat('pt-BR', {
     timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit'
 });
@@ -17,6 +18,7 @@ const monthName = new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC', year: 'num
 const text = value => typeof value === 'string' ? value.trim() : '';
 const limitedSearch = value => text(value).slice(0, 160);
 const list = value => value === undefined ? [] : Array.isArray(value) ? value : [value];
+const kilometersField = meters => meters == null ? '' : String(meters / 1000).replace('.', ',');
 
 function today() {
     const parts = Object.fromEntries(saoPauloDate.formatToParts(new Date()).map(({ type, value }) => [type, value]));
@@ -144,6 +146,9 @@ function formDraft(visit, requestedDay, selectedClient) {
         address: visit?.address || selectedClient?.address || '',
         status: visit?.status || 'agendada',
         assigneeIds: visit?.assignees.map(({ id }) => id) || [],
+        travelPayeeId: visit?.travelPayeeId || '',
+        outboundKm: kilometersField(visit?.manualTravel?.outboundMeters),
+        roundTripKm: kilometersField(visit?.manualTravel?.roundTripMeters),
         materials: visit?.materialsUsed.map(line => ({
             materialId: line.materialId,
             plannedQuantity: String(line.plannedQuantity), usedQuantity: String(line.usedQuantity)
@@ -203,6 +208,9 @@ function draftFromBody(body, visit) {
         status: text(body.status) || visit?.status || 'agendada',
         confirmed: body.confirmConsumption === 'on',
         assigneeIds: list(body.assigneeId).slice(0, 21).map(id => text(id).toLowerCase()),
+        travelPayeeId: body.travelPayeeId === undefined ? visit?.travelPayeeId || '' : text(body.travelPayeeId).toLowerCase(),
+        outboundKm: body.outboundKm === undefined ? kilometersField(visit?.manualTravel?.outboundMeters) : text(body.outboundKm),
+        roundTripKm: body.roundTripKm === undefined ? kilometersField(visit?.manualTravel?.roundTripMeters) : text(body.roundTripKm),
         materials: materialIds.map((materialId, index) => ({
             materialId: text(materialId).toLowerCase(), plannedQuantity: text(planned[index]), usedQuantity: text(used[index])
         })),
@@ -234,6 +242,9 @@ function validate(draft, body, visit, canPrice) {
         draft.assigneeIds.some(id => !isUuid(id)) || draft.materials.some(line => !isUuid(line.materialId))
     ))
         errors.push('Confira os responsáveis e selecione até 25 materiais válidos.');
+    if (body.travelPayeeId !== undefined && (typeof body.travelPayeeId !== 'string' || !draft.official
+        || (draft.travelPayeeId && !draft.assigneeIds.includes(draft.travelPayeeId))))
+        errors.push('Escolha um responsável da visita para receber o deslocamento.');
     return errors;
 }
 
@@ -244,10 +255,34 @@ function priceCents(value) {
     return Number(whole) * 100 + Number(fraction.padEnd(2, '0'));
 }
 
+function mileageFromBody(draft, body, errors) {
+    if (body.outboundKm === undefined && body.roundTripKm === undefined)
+        return undefined;
+    if (typeof body.outboundKm !== 'string' || typeof body.roundTripKm !== 'string') {
+        errors.push('Informe a quilometragem de ida e a total.');
+        return null;
+    }
+    if (!draft.outboundKm && !draft.roundTripKm)
+        return null;
+
+    const toMeters = value => {
+        const match = kilometersPattern.exec(value);
+        return match ? Number(match[1]) * 1000 + Number((match[2] || '').padEnd(3, '0')) : NaN;
+    };
+    const outboundMeters = toMeters(draft.outboundKm);
+    const roundTripMeters = toMeters(draft.roundTripKm);
+    if (!Number.isFinite(outboundMeters) || !Number.isFinite(roundTripMeters))
+        errors.push('Preencha as duas distâncias em quilômetros com até três casas decimais.');
+    else if (roundTripMeters < outboundMeters)
+        errors.push('A quilometragem total deve ser igual ou superior à distância de ida.');
+    return { outboundMeters, roundTripMeters };
+}
+
 async function save(req, res, visit) {
     const body = req.body || {};
     const draft = draftFromBody(body, visit);
     const errors = validate(draft, body, visit, req.user.role === 'admin');
+    const manualTravel = mileageFromBody(draft, body, errors);
     if (!draft.clientId && draft.clientName && draft.clientName.length <= 340) {
         const options = await Client.options(draft.clientName, true);
         if (options.length === 1)
@@ -265,7 +300,11 @@ async function save(req, res, visit) {
             requireAddress: draft.official && !visit,
             scheduledAt: draft.scheduledTime ? `${draft.scheduledDate}T${draft.scheduledTime}` : draft.scheduledDate,
             servicePriceCents: priceCents(draft.servicePrice),
-            resources: draft.official ? { assigneeIds: draft.assigneeIds, materials: draft.materials } : undefined,
+            manualTravel,
+            resources: draft.official ? {
+                assigneeIds: draft.assigneeIds, materials: draft.materials,
+                travelPayeeId: body.travelPayeeId === undefined ? undefined : draft.travelPayeeId || null
+            } : undefined,
             materials: text(body.materials).slice(0, 2000), technicians: text(body.technicians).slice(0, 240)
         };
         const saved = visit ? await Visit.update(visit.id, data) : await Visit.create(data);

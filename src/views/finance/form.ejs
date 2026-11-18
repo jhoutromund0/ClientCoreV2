@@ -39,7 +39,7 @@
       <label>Valor do serviço (R$)
         <input name="labor" inputmode="decimal" maxlength="9" value="<%= draft.labor %>" required>
       </label>
-      <label>Deslocamento cobrado (R$)
+      <label>Cobrança de deslocamento ao cliente (R$)
         <input name="travelCharge" inputmode="decimal" maxlength="9" value="<%= draft.travelCharge %>" required>
       </label>
       <label>Outras despesas do atendimento (R$)
@@ -56,9 +56,12 @@
         <div><dt>Ida</dt><dd><%= formatKm(state.travel.outboundMeters) %></dd></div>
         <div><dt>Ida e volta</dt><dd><%= formatKm(state.travel.roundTripMeters) %></dd></div>
         <div><dt>Tarifa por km</dt><dd><%= state.travel.rateCentsPerKm == null ? 'A definir' : formatMoney(state.travel.rateCentsPerKm) %></dd></div>
-        <div><dt>Custo de deslocamento</dt><dd><%= state.travel.costCents == null ? 'A calcular' : formatMoney(state.travel.costCents) %></dd></div>
+        <div><dt>Valor a pagar pelo deslocamento</dt><dd><%= state.travel.costCents == null ? 'A calcular' : formatMoney(state.travel.costCents) %></dd></div>
+        <% if (state.travel.payeeName) { %><div><dt>Quem recebe</dt><dd><%= state.travel.payeeName %></dd></div><% } %>
       </dl>
+      <% if (state.travel.source !== 'manual') { %>
       <p class="muted form-hint"><a class="travel-attribution" href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a></p>
+      <% } %>
       <% } else { %>
       <p class="muted"><%= state.travelDescription.statusMessage %></p>
       <% } %>

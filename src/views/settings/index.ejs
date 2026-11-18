@@ -1,7 +1,7 @@
 <main id="main-content" class="shell inner-page form-page">
   <h1>Configurações</h1>
   <%- include('nav', { section: 'travel' }) %>
-  <p class="muted">O custo de deslocamento considera a distância de ida e volta e a tarifa por quilômetro. Alterações atualizam as estimativas de clientes e visitas em segundo plano.</p>
+  <p class="muted">O valor do deslocamento considera a distância de ida e volta. Quando o responsável tem uma tarifa individual, ela é usada na visita.</p>
 
   <% if (!locationsConfigured) { %>
   <p class="muted" role="status">O cálculo de deslocamentos está indisponível no momento.</p>
@@ -25,7 +25,7 @@
         <input name="originAddress" value="<%= settings.originAddress %>" maxlength="300" required placeholder="Rua, número, bairro, cidade, UF e CEP">
       </label>
       <label>
-        Tarifa de gasolina (R$/km)
+        Tarifa padrão de deslocamento (R$/km)
         <input name="rate" value="<%= settings.rate %>" inputmode="decimal" maxlength="9" required placeholder="10,00">
       </label>
     </div>

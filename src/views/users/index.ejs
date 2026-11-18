@@ -37,6 +37,9 @@
             <option value="admin">Administrador</option>
           </select>
         </label>
+        <label>Tarifa de reembolso (R$/km)
+          <input name="mileageRate" inputmode="decimal" maxlength="9" placeholder="Tarifa da empresa">
+        </label>
         <label>Sua senha atual
           <input name="currentPassword" type="password" autocomplete="current-password" maxlength="200" required>
         </label>
@@ -80,6 +83,10 @@
                     <option value="analista"<%= account.role === 'analista' ? ' selected' : '' %>>Analista</option>
                     <option value="admin"<%= account.role === 'admin' ? ' selected' : '' %>>Administrador</option>
                   </select>
+                </label>
+                <label>Tarifa de reembolso (R$/km)
+                  <input name="mileageRate" inputmode="decimal" maxlength="9" placeholder="Tarifa da empresa"
+                         value="<%= account.mileage_rate_cents_per_km == null ? '' : (account.mileage_rate_cents_per_km / 100).toFixed(2).replace('.', ',') %>">
                 </label>
                 <label>Sua senha atual
                   <input name="currentPassword" type="password" autocomplete="current-password" maxlength="200" required>

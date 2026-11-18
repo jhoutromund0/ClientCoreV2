@@ -9,7 +9,7 @@ const pending = 'invite:pending';
 const dummySalt = 'e2bee928f4d4ab6acd9661ade99d54cbc';
 const hashToken = token => createHash('sha256').update(token).digest('hex');
 const randomToken = () => randomBytes(32).toString('hex');
-const columns = 'id, name, email, role, active, created_at';
+const columns = 'id, name, email, role, active, created_at, mileage_rate_cents_per_km';
 
 async function hashPassword(password) {
     const salt = randomBytes(16).toString('hex');
@@ -44,11 +44,11 @@ async function page(cursor) {
     return { ...pageFrom(rows, limit), after: sort === null ? null : cursor };
 }
 
-async function create({ name, email, password, role }) {
+async function create({ name, email, password, role, mileageRateCentsPerKm = null }) {
     const { rows } = await write(`
-        INSERT INTO users(name, email, password_hash, role)
-        VALUES ($1, $2, $3, $4) RETURNING ${columns}
-    `, [name, email.toLowerCase(), await hashPassword(password), role]);
+        INSERT INTO users(name, email, password_hash, role, mileage_rate_cents_per_km)
+        VALUES ($1, $2, $3, $4, $5) RETURNING ${columns}
+    `, [name, email.toLowerCase(), await hashPassword(password), role, mileageRateCentsPerKm]);
     return rows[0];
 }
 
@@ -65,7 +65,7 @@ async function savePasswordLink(client, userId) {
 async function manage(actor, targetId, work) {
     return withTransaction(async client => {
         const { rows } = await client.query(`
-            SELECT id, email, role, active, password_hash
+            SELECT id, email, role, active, password_hash, mileage_rate_cents_per_km
             FROM users WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE
         `, [[actor.id, targetId || actor.id]]);
         const admin = rows.find(row => row.id === actor.id);
@@ -75,12 +75,12 @@ async function manage(actor, targetId, work) {
     });
 }
 
-async function createInvited({ name, email, role }, actor) {
+async function createInvited({ name, email, role, mileageRateCentsPerKm = null }, actor) {
     return manage(actor, null, async client => {
         const { rows } = await client.query(`
-            INSERT INTO users(name, email, password_hash, role)
-            VALUES ($1, $2, $3, $4) RETURNING id
-        `, [name, email, pending, role]);
+            INSERT INTO users(name, email, password_hash, role, mileage_rate_cents_per_km)
+            VALUES ($1, $2, $3, $4, $5) RETURNING id
+        `, [name, email, pending, role, mileageRateCentsPerKm]);
         return savePasswordLink(client, rows[0].id);
     });
 }
@@ -136,13 +136,14 @@ async function changePassword(account, password, sessionHash) {
     });
 }
 
-async function update(id, { name, email, role, active }, keepSession, actor) {
+async function update(id, { name, email, role, active, mileageRateCentsPerKm }, keepSession, actor) {
     return manage(actor, id, async (client, previous) => {
         if (!previous) return false;
         if (previous.id === actor.id && (!active || role !== 'admin')) return false;
+        const mileageRate = mileageRateCentsPerKm === undefined ? previous.mileage_rate_cents_per_km : mileageRateCentsPerKm;
         await client.query(
-            'UPDATE users SET name = $2, email = $3, role = $4, active = $5 WHERE id = $1',
-            [id, name, email, role, active]
+            'UPDATE users SET name = $2, email = $3, role = $4, active = $5, mileage_rate_cents_per_km = $6 WHERE id = $1',
+            [id, name, email, role, active, mileageRate]
         );
         if (previous.email !== email || previous.role !== role || previous.active !== active) {
             await client.query('DELETE FROM password_links WHERE user_id = $1', [id]);

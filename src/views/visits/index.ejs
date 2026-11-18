@@ -40,7 +40,7 @@
     <%- include('../partials/pagination', {
         page, path: '/visitas', params: { ...(search ? { cliente: search } : {}), ...(status ? { situacao: status } : {}) }
     }) %>
-    <% if (visits.some(visit => visit.tripDisplay.roundTripKm)) { %>
+    <% if (visits.some(visit => visit.tripDisplay.roundTripKm && !visit.tripDisplay.manual)) { %>
     <p class="storage-note"><a class="travel-attribution" href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a></p>
     <% } %>
   </section>

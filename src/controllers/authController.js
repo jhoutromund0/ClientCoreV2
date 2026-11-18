@@ -93,7 +93,7 @@ exports.createUser = async (req, res) => {
     const result = await reauthenticate(req, res);
     if (result.error) return renderUsers(req, res, result);
     const form = await input.account(req.body);
-    if (!form) return renderUsers(req, res, { error: 'Confira nome, e-mail e perfil.', status: 422 });
+    if (!form) return renderUsers(req, res, { error: 'Confira nome, e-mail, perfil e tarifa por quilômetro.', status: 422 });
     const origin = auth.linkOrigin(req);
     if (!origin)
         return renderUsers(req, res, { error: 'Configure o endereço público do aplicativo para gerar links.', status: 503 });
@@ -117,7 +117,7 @@ exports.updateUser = async (req, res) => {
     const form = await input.account(req.body);
     const active = req.body?.active === 'on';
     if (!form || !isUuid(id))
-        return renderUsers(req, res, { error: 'Confira nome, e-mail e perfil.', status: 422 });
+        return renderUsers(req, res, { error: 'Confira nome, e-mail, perfil e tarifa por quilômetro.', status: 422 });
     const own = id.toLowerCase() === req.user.id;
     if (own && (!active || form.role !== 'admin')) {
         return renderUsers(req, res, { error: 'Você não pode retirar seu próprio acesso de administrador.', status: 422 });

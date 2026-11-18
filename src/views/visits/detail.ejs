@@ -28,16 +28,22 @@
     </section>
     <section class="panel">
       <div class="panel-head"><h2>Deslocamento</h2></div>
-      <% if (tripDisplay.roundTripKm) { %>
+      <% if (visit.status !== 'cancelada') { %>
       <dl class="travel-distances">
-        <dt>Distância de ida</dt><dd><%= tripDisplay.outboundKm %></dd>
-        <dt>Distância total</dt><dd><%= tripDisplay.roundTripKm %></dd>
-        <dt>Custo da ida</dt><dd><%= tripDisplay.outboundCost || 'A definir' %></dd>
-        <dt>Custo total</dt><dd><%= tripDisplay.roundTripCost || 'A definir' %></dd>
+        <dt>Quilometragem de ida</dt><dd><%= tripDisplay.outboundKm || 'A calcular' %></dd>
+        <dt>Ida e volta</dt><dd><%= tripDisplay.roundTripKm || 'A calcular' %></dd>
+        <% if (tripDisplay.payeeName) { %><dt>Quem recebe</dt><dd><%= tripDisplay.payeeName %></dd><% } %>
+        <dt>Tarifa por km</dt><dd><%= tripDisplay.rate || 'A definir' %></dd>
+        <dt>Valor a pagar</dt><dd><strong><%= tripDisplay.amount || 'A calcular' %></strong></dd>
       </dl>
+      <% } %>
+      <% if (tripDisplay.roundTripKm && tripDisplay.manual) { %>
+      <p class="muted form-hint">Quilometragem informada na visita.</p>
+      <% } else if (tripDisplay.roundTripKm) { %>
       <p class="storage-note"><a class="travel-attribution" href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a></p>
       <% } %>
       <% if (tripDisplay.statusMessage) { %><p class="muted"><%= tripDisplay.statusMessage %></p><% } %>
+      <% if (tripDisplay.needsPayee) { %><p class="muted">Selecione quem recebe o deslocamento ao editar a visita.</p><% } %>
     </section>
   </div>
 

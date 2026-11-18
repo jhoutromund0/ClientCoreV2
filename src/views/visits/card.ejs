@@ -7,8 +7,9 @@
   <p><%= visit.description || 'Serviço a vincular' %></p>
   <p><strong>Responsáveis</strong><span><%= visit.technicians || 'A definir' %></span></p>
   <p><strong>Endereço</strong><span><%= visit.address || 'A definir' %></span></p>
-  <% if (operational && visit.tripDisplay.roundTripKm) { %>
-  <p><strong>Deslocamento total</strong><span><%= [visit.tripDisplay.roundTripKm, visit.tripDisplay.roundTripCost].filter(Boolean).join(' · ') %></span></p>
+  <% if (operational && visit.status !== 'cancelada') { %>
+  <p><strong>Quilometragem de ida e volta</strong><span><%= visit.tripDisplay.roundTripKm || 'A calcular' %></span></p>
+  <p><strong>Valor a pagar pelo deslocamento</strong><span><%= visit.tripDisplay.amount || 'A calcular' %><% if (visit.tripDisplay.payeeName) { %> · <%= visit.tripDisplay.payeeName %><% } %></span></p>
   <% } %>
   <div class="actions">
     <a class="text-button" href="/visitas/<%= visit.id %>">Ver detalhes</a>

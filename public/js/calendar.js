@@ -8,11 +8,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const add = form.querySelector('[data-visit-material-add]');
     const address = form.elements.address;
     const clients = form.elements.clientId;
+    const assignees = form.elements.assigneeId;
+    const travelPayee = form.elements.travelPayeeId;
     const lookups = new WeakMap();
     let lastAddress = clients.selectedOptions[0]?.dataset.address || '';
 
     function updateMaterialLimit() {
         add.disabled = rows.children.length >= 25;
+    }
+
+    function updateTravelPayees() {
+        const previous = travelPayee.value;
+        const options = [...assignees.selectedOptions].map(option => new Option(option.textContent.trim(), option.value));
+        travelPayee.replaceChildren(travelPayee.options[0], ...options);
+        travelPayee.value = options.some(option => option.value === previous) ? previous : '';
     }
 
     function stopLookup(input) {
@@ -82,6 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
             address.value = current;
         lastAddress = current;
     });
+    assignees.addEventListener('change', updateTravelPayees);
 
     add.addEventListener('click', () => {
         if (rows.children.length >= 25)

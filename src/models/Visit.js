@@ -10,12 +10,21 @@ const text = value => typeof value === 'string' ? value.trim() : '';
 const addressSql = "COALESCE(NULLIF(btrim(visits.data->>'address'), ''), clients.data->>'address', '')";
 const billedSql = "COALESCE(financial_records.data->'billingFinalized' = 'true'::jsonb, FALSE)";
 const columnList = `visits.id, visits.data, visits.client_id, visits.service_id, visits.scheduled_day AS sort_key,
-    ${addressSql} AS address, ${billedSql} AS billing_finalized`;
+    ${addressSql} AS address, ${billedSql} AS billing_finalized,
+    CASE WHEN ${billedSql} THEN financial_records.data->'travel' END AS billed_travel`;
 const base = `FROM visits LEFT JOIN clients ON clients.id = visits.client_id
     LEFT JOIN financial_records ON financial_records.id = visits.id`;
 
 class ValidationError extends Error {}
 class ConflictError extends Error {}
+
+function normalizeManualTravel(travel) {
+    const { outboundMeters, roundTripMeters } = travel || {};
+    if (!Number.isInteger(outboundMeters) || !Number.isInteger(roundTripMeters)
+        || outboundMeters < 0 || roundTripMeters < outboundMeters || roundTripMeters > 999999999)
+        return null;
+    return { outboundMeters, roundTripMeters };
+}
 
 function format(row, resources = {}) {
     const raw = row.data || {};
@@ -34,6 +43,9 @@ function format(row, resources = {}) {
         status: hasOperationalStatus ? raw.status : 'agendada',
         hasOperationalStatus,
         billingFinalized: row.billing_finalized === true,
+        billedTravel: row.billed_travel || null,
+        manualTravel: normalizeManualTravel(raw.manualTravel),
+        travelPayeeId: resources.travelPayeeId ?? null,
         technicians: assignees.length ? assignees.map(assignee => assignee.name).join(', ') : text(raw.technicians),
         materials: text(raw.materials),
         assignees,
@@ -99,6 +111,9 @@ async function prepare(runner, input, previous) {
         throw new ConflictError('Uma visita concluída mantém o consumo confirmado. Corrija as quantidades na edição, se necessário.');
     if (status === 'concluida' && (!previous || previous.status !== status || input.resources) && !input.confirmed)
         throw new ValidationError('Confirme o consumo informado para concluir a visita.');
+    const manualTravel = input.manualTravel === undefined ? previous?.manualTravel ?? null : normalizeManualTravel(input.manualTravel);
+    if (input.manualTravel != null && !manualTravel)
+        throw new ValidationError('Informe uma quilometragem total igual ou superior à distância de ida.');
 
     return {
         clientId: client.id,
@@ -109,6 +124,7 @@ async function prepare(runner, input, previous) {
         scheduledAt: input.scheduledAt,
         address,
         status,
+        manualTravel,
         materials: text(previous?.materials || input.materials),
         technicians: text(previous?.assignees?.length ? '' : previous?.technicians || input.technicians)
     };

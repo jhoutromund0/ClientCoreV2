@@ -116,6 +116,8 @@ Para rodar localmente por HTTP, use `NODE_ENV=development`, `APP_URL=http://loca
 
 Em **Configurações**, o administrador define o endereço de partida e a tarifa em reais por quilômetro. O sistema calcula a rota de carro para o endereço efetivo da visita, registra as distâncias de ida e de ida e volta e multiplica a distância total pela tarifa. Alterações no local ou nas configurações atualizam as estimativas em segundo plano. Lançamentos já concluídos mantêm o custo registrado.
 
+Em **Configurações → Usuários**, o administrador pode definir uma tarifa individual por quilômetro. A tarifa padrão da empresa é usada quando a conta não tem tarifa própria. Na edição da visita, é possível informar a quilometragem manualmente e selecionar quem recebe o deslocamento entre os responsáveis. Com um único responsável, a atribuição é automática. O valor a pagar aparece em **Visitas** e entra nas despesas do financeiro. A cobrança ao cliente fica no campo próprio do lançamento.
+
 1. Execute `npm run db:migrate` com `DATABASE_URL` configurada para aplicar as migrações, incluindo a tabela de configuração de deslocamentos.
 2. Defina `NOMINATIM_BASE_URL` e `OSRM_BASE_URL` no ambiente do servidor com as URLs de instâncias próprias ou contratadas. O Nominatim deve oferecer `/search`. O OSRM deve oferecer `/table/v1/driving` e, se a matriz não incluir distâncias, `/route/v1/driving`. `OSM_USER_AGENT` permite identificar a instalação nos pedidos aos serviços.
 3. Inicie a aplicação e preencha a tarifa em **Configurações**. O endereço inicial já aparece no formulário.
