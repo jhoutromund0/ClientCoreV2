@@ -1,0 +1,15 @@
+<% if (trip.outboundKm || trip.roundTripKm) { %>
+<dl class="travel-distances">
+  <% if (trip.outboundKm) { %>
+  <dt>Ida</dt>
+  <dd><%= trip.outboundKm %><% if (trip.outboundCost) { %> · <%= trip.outboundCost %><% } %></dd>
+  <% } %>
+  <% if (trip.roundTripKm) { %>
+  <dt>Ida e volta</dt>
+  <dd><%= trip.roundTripKm %><% if (trip.roundTripCost) { %> · <%= trip.roundTripCost %><% } %></dd>
+  <% } %>
+</dl>
+<% } %>
+<% if (trip.statusMessage) { %>
+<p class="travel-status"><%= trip.statusMessage %></p>
+<% } %>

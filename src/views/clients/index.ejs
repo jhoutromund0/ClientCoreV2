@@ -36,6 +36,15 @@
             Telefone
           </th>
           <th>
+            Endereço
+          </th>
+          <th>
+            Tipo de estabelecimento
+          </th>
+          <th>
+            Deslocamento
+          </th>
+          <th>
             Ações
           </th>
         </tr>
@@ -60,12 +69,26 @@
           <td>
             <%= client.phone || '—' %>
           </td>
+          <td class="client-address">
+            <%= client.address || '—' %>
+          </td>
+          <td>
+            <%= client.establishmentType === 'matriz' ? 'Matriz' : client.establishmentType === 'filial' ? 'Filial' : '—' %>
+          </td>
+          <td>
+            <% if (client.tripDisplay) { %>
+            <%- include('travel', { trip: client.tripDisplay }) %>
+            <% } else { %>
+            —
+            <% } %>
+          </td>
           <td class="actions">
-            <a href="/clientes/<%= client.id %>
-              /editar">Editar
+            <a href="/clientes/<%= client.id %>/editar">Editar
             </a>
-            <form action="/clientes/<%= client.id %>
-              /excluir" method="post" data-confirm="Excluir este cliente?">
+            <form action="/clientes/<%= client.id %>/excluir" method="post" data-confirm="Excluir este cliente?">
+              <% if (typeof csrfToken !== 'undefined' && csrfToken) { %>
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <% } %>
               <button class="text-button danger" type="submit">
                 Excluir
               </button>
@@ -95,4 +118,7 @@
   <p class="storage-note">
     ⓘ Dados armazenados no PostgreSQL.
   </p>
+  <% if (clients.length) { %>
+  <p class="storage-note"><a class="travel-attribution" href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a></p>
+  <% } %>
 </main>

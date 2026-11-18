@@ -73,7 +73,9 @@ button,input {
 .main-nav {
   display:flex;
   align-items:center;
-  gap:27px;
+  flex-wrap:wrap;
+  justify-content:center;
+  gap:6px 27px;
   margin:auto
 }
 .main-nav a,.login-link {
@@ -496,14 +498,14 @@ button,input {
   gap:17px;
   margin-top:25px
 }
-.form-stack label,.client-form label {
+.form-stack label,.client-form label,.settings-form label {
   display:grid;
   gap:8px;
   color:#dce0d8;
   font-size:12px;
   font-weight:650
 }
-.form-stack input,.client-form input {
+.form-stack input,.client-form input,.client-form select,.settings-form input {
   width:100%;
   padding:13px 14px;
   border:1px solid #394137;
@@ -512,7 +514,7 @@ button,input {
   color:#fff;
   outline:none
 }
-.form-stack input:focus,.client-form input:focus {
+.form-stack input:focus,.client-form input:focus,.client-form select:focus,.settings-form input:focus {
   border-color:var(--accent);
   box-shadow:0 0 0 3px #c5bdb11c
 }
@@ -564,6 +566,12 @@ td,th {
 }
 td {
   color:#d7dbd4
+}
+.client-address {
+  min-width:12rem;
+  max-width:20rem;
+  white-space:normal;
+  overflow-wrap:anywhere
 }
 tbody tr:last-child td {
   border-bottom:0
@@ -621,6 +629,38 @@ tbody tr:last-child td {
   color:#b5aa98;
   margin-top:18px
 }
+.travel-summary h2 {
+  margin:0 0 8px;
+  font-size:16px
+}
+.travel-distances {
+  display:grid;
+  grid-template-columns:max-content max-content;
+  gap:4px 10px;
+  margin:0;
+  font-size:12px
+}
+.travel-distances dt,.travel-status {
+  color:var(--muted)
+}
+.travel-distances dd {
+  margin:0
+}
+.travel-status {
+  margin:0;
+  font-size:12px
+}
+.travel-distances + .travel-status {
+  margin-top:7px
+}
+td .travel-status {
+  min-width:11rem;
+  max-width:16rem;
+  white-space:normal
+}
+.travel-attribution {
+  text-decoration:underline
+}
 .back-link {
   display:block;
   color:var(--muted);
@@ -630,7 +670,7 @@ tbody tr:last-child td {
 .form-page h1 {
   margin-bottom:5px
 }
-.client-form {
+.client-form,.settings-form {
   margin-top:30px;
   padding:28px;
   background:#171b17;
@@ -641,6 +681,9 @@ tbody tr:last-child td {
   display:grid;
   grid-template-columns:1fr 1fr;
   gap:20px
+}
+.client-address-field,.settings-address-field {
+  grid-column:1 / -1
 }
 .form-actions {
   display:flex;
@@ -729,7 +772,7 @@ tbody tr:last-child td {
     gap:15px
   }
   .main-nav {
-    gap:14px
+    gap:6px 14px
   }
   .hero {
     grid-template-columns:1fr;
@@ -783,7 +826,8 @@ tbody tr:last-child td {
     background:#171b17;
     border-bottom:1px solid var(--line);
     flex-direction:column;
-    align-items:flex-start
+    align-items:flex-start;
+    gap:14px
   }
   .main-nav.open {
     display:flex
@@ -850,7 +894,7 @@ tbody tr:last-child td {
   .form-grid {
     grid-template-columns:1fr
   }
-  .client-form {
+  .client-form,.settings-form {
     padding:18px
   }
   .form-actions {
@@ -876,18 +920,6 @@ tbody tr:last-child td {
   background:#b7a4f715;
   border:1px solid #b7a4f740;
   color:#d3c8fa
-}
-.input-action {
-  display:flex;
-  gap:10px;
-  align-items:stretch
-}
-.input-action input {
-  flex:1;
-  min-width:0
-}
-.input-action .button {
-  white-space:nowrap
 }
 .lookup-status {
   min-height:20px;

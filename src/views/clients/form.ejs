@@ -25,42 +25,54 @@
     </ul>
   </div>
   <% } %>
-  <form class="client-form" action="<%= clientData.id ? '/clientes/' + clientData.id : '/clientes' %>
-    " method="post">
+  <form class="client-form" action="<%= clientData.id ? '/clientes/' + clientData.id : '/clientes' %>" method="post">
+    <% if (typeof csrfToken !== 'undefined' && csrfToken) { %>
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <% } %>
     <div class="form-grid">
       <label>
         Nome do contato / responsável *
-        <input name="name" value="<%= clientData.name || '' %>
-        " required maxlength="120" placeholder="Nome completo">
-      </label>
-      <label>
-        Empresa
-        <input name="company" value="<%= clientData.company || '' %>
-        " maxlength="160" placeholder="Nome da empresa">
+        <input name="name" value="<%= clientData.name || '' %>" required maxlength="120" placeholder="Nome completo">
       </label>
       <label>
         CNPJ
-        <span class="input-action">
-          <input name="cnpj" value="<%= clientData.cnpj || '' %>
-          " maxlength="18" inputmode="numeric" autocomplete="off" placeholder="00.000.000/0000-00">
-          <button class="button button-small button-ghost" type="button" data-cnpj-lookup>
-            Buscar dados
-          </button>
-        </span>
+        <input name="cnpj" value="<%= clientData.cnpj || '' %>" maxlength="18" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="00.000.000/0000-00" aria-describedby="cnpj-status">
+      </label>
+      <label>
+        Empresa
+        <input name="company" value="<%= clientData.company || '' %>" maxlength="160" placeholder="Nome da empresa">
+      </label>
+      <label>
+        Tipo de estabelecimento
+        <select name="establishmentType">
+          <option value="">Não informado</option>
+          <option value="matriz"<%= clientData.establishmentType === 'matriz' ? ' selected' : '' %>>Matriz</option>
+          <option value="filial"<%= clientData.establishmentType === 'filial' ? ' selected' : '' %>>Filial</option>
+        </select>
       </label>
       <label>
         E-mail
-        <input type="email" name="email" value="<%= clientData.email || '' %>
-        " placeholder="contato@empresa.com">
+        <input type="email" name="email" value="<%= clientData.email || '' %>" maxlength="160" placeholder="contato@empresa.com">
       </label>
       <label>
         Telefone
-        <input type="tel" name="phone" value="<%= clientData.phone || '' %>
-        " placeholder="(00) 00000-0000">
+        <input type="tel" name="phone" value="<%= clientData.phone || '' %>" maxlength="20" placeholder="(00) 00000-0000">
+      </label>
+      <label class="client-address-field">
+        Endereço
+        <input name="address" value="<%= clientData.address || '' %>" maxlength="300" placeholder="Rua, número, complemento, bairro, cidade, UF e CEP">
       </label>
     </div>
-    <p class="lookup-status" data-cnpj-status role="status" aria-live="polite">
-    </p>
+    <p class="lookup-status" id="cnpj-status" role="status"></p>
+    <section class="travel-summary" aria-labelledby="travel-heading">
+      <h2 id="travel-heading">Deslocamento</h2>
+      <% if (clientData.id && typeof travel !== 'undefined' && travel) { %>
+      <%- include('travel', { trip: travel }) %>
+      <% } else { %>
+      <p class="travel-status">A distância e o gasto estimado são calculados após salvar o endereço.</p>
+      <% } %>
+      <p class="storage-note"><a class="travel-attribution" href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a></p>
+    </section>
     <div class="form-actions">
       <a class="button button-ghost" href="/clientes">
         Cancelar

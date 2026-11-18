@@ -1,6 +1,10 @@
 const app = require('./app');
+const clientTravelService = require('./services/clientTravelService');
 const port = Number(process.env.PORT || 3000);
-const server = app.listen(port, () => console.log(`Client Core disponível em http://localhost:${port}`));
+const server = app.listen(port, () => {
+    console.log(`Client Core disponível em http://localhost:${port}`);
+    server.once('close', clientTravelService.start());
+});
 server.on('error', (err) => {
     if (err.code === 'EADDRINUSE')
         console.error(`A porta ${port} já está em uso. Feche o outro processo ou defina outra PORT no .env.`);

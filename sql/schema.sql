@@ -3,6 +3,12 @@ CREATE TABLE IF NOT EXISTS users (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 CREATE TABLE IF NOT EXISTS sessions(token_hash CHAR(64) PRIMARY KEY,user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,csrf_token CHAR(64) NOT NULL,expires_at TIMESTAMPTZ NOT NULL);
 CREATE INDEX IF NOT EXISTS sessions_expires_idx ON sessions(expires_at);
 CREATE TABLE IF NOT EXISTS clients(id UUID PRIMARY KEY,data JSONB NOT NULL);
+CREATE TABLE IF NOT EXISTS transport_settings (
+    id BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (id),
+    origin_address TEXT NOT NULL,
+    rate_cents_per_km INTEGER CHECK (rate_cents_per_km >= 0),
+    revision UUID NOT NULL
+);
 CREATE TABLE IF NOT EXISTS materials(id UUID PRIMARY KEY,data JSONB NOT NULL);
 CREATE TABLE IF NOT EXISTS visits(id UUID PRIMARY KEY,data JSONB NOT NULL);
 CREATE TABLE IF NOT EXISTS financial_records(id UUID PRIMARY KEY,data JSONB NOT NULL);

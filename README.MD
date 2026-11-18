@@ -78,6 +78,16 @@ A página inicial e a seção Sobre permanecem públicas. As funcionalidades int
 
 O cadastro de usuários é restrito aos administradores, não sendo permitido o registro público de novas contas.
 
+## Deslocamento de clientes
+
+Em **Configurações**, o administrador pode alterar o endereço de partida da empresa e informar a tarifa de gasolina em reais por quilômetro. O sistema calcula a rota de carro para cada cliente com endereço, registra a distância da ida e o total de ida e volta, e multiplica cada distância pela tarifa. Alterações na configuração são aplicadas aos clientes existentes em segundo plano.
+
+1. Em um banco existente, execute `npm run db:migrate:transport` com `DATABASE_URL` configurada para criar a tabela de configuração. Para um banco novo, aplique `sql/schema.sql`.
+2. Defina `NOMINATIM_BASE_URL` e `OSRM_BASE_URL` no ambiente do servidor com as URLs de instâncias próprias ou contratadas. O Nominatim deve oferecer `/search`. O OSRM deve oferecer `/table/v1/driving` e, se a matriz não incluir distâncias, `/route/v1/driving`. `OSM_USER_AGENT` permite identificar a instalação nos pedidos aos serviços.
+3. Inicie a aplicação e preencha a tarifa em **Configurações**. O endereço inicial já aparece no formulário.
+
+O processamento de carteiras de clientes usa instâncias adequadas a consultas recorrentes. Consulte a [política do Nominatim público](https://operations.osmfoundation.org/policies/nominatim/) e a [documentação da API de rotas do OSRM](https://project-osrm.org/docs/v5.24.0/api/).
+
 ## 🛠️ Tecnologias Utilizadas
 
 ### Front-end

@@ -9,7 +9,11 @@ const validateClient = [
     body('email').optional({ checkFalsy: true }).isString().bail().isEmail().withMessage('Informe um e-mail válido.').isLength({ max: 160 }).withMessage('O e-mail deve ter até 160 caracteres.'),
     optionalText('company', 160, 'Empresa'),
     optionalText('cnpj', 18, 'CNPJ').custom((value) => !value || isValidCnpj(value)).withMessage('Informe um CNPJ válido.'),
-    optionalText('phone', 20, 'Telefone')
+    optionalText('phone', 20, 'Telefone'),
+    optionalText('address', 300, 'Endereço'),
+    body('establishmentType').optional().custom(value =>
+        typeof value === 'string' && ['', 'matriz', 'filial'].includes(value.trim())
+    ).withMessage('Informe se o estabelecimento é matriz ou filial.')
 ];
 router.get('/', wrap(clients.index));
 router.get('/novo', wrap(clients.createForm));

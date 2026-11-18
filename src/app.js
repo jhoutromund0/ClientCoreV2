@@ -8,6 +8,7 @@ const clientRoutes = require('./routes/clientRoutes');
 const materialRoutes = require('./routes/materialRoutes');
 const visitRoutes = require('./routes/visitRoutes');
 const financeRoutes = require('./routes/financeRoutes');
+const settingsRoutes = require('./routes/settingsRoutes');
 const pageController = require('./controllers/pageController');
 const auth = require('./middleware/auth');
 const authRoutes = require('./routes/authRoutes');
@@ -41,6 +42,7 @@ app.use('/clientes', auth.requireAuth, clientRoutes);
 app.use('/materiais', auth.requireAuth, materialRoutes);
 app.use('/calendario', auth.requireAuth, visitRoutes);
 app.use('/financeiro', auth.requireRole('admin'), financeRoutes);
+app.use('/configuracoes', auth.requireRole('admin'), settingsRoutes);
 app.use((req, res) => pageController.notFound(req, res));
 app.use((err, req, res, next) => {
     if (res.headersSent)

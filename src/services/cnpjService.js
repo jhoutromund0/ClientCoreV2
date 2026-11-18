@@ -20,21 +20,22 @@ class CnpjError extends Error {
     }
 }
 const onlyDigits = (value) => String(value || '').replace(/\D/g, '');
+const normalizeCnpj = (value) => String(value || '').replace(/[./\s-]/g, '').toUpperCase();
 function isValidCnpj(value) {
-    const cnpj = onlyDigits(value);
-    if (cnpj.length !== 14 || /^(\d)\1{13}$/.test(cnpj))
+    const cnpj = normalizeCnpj(value);
+    if (!/^[A-Z0-9]{12}\d{2}$/.test(cnpj) || /^(\d)\1{13}$/.test(cnpj))
         return false;
     const check = (length) => {
         const weights = length === 12 ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2] : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
-        const sum = weights.reduce((acc, weight, i) => acc + Number(cnpj[i]) * weight, 0);
+        // O cálculo oficial usa o código ASCII de cada caractere menos 48.
+        const sum = weights.reduce((acc, weight, i) => acc + (cnpj.charCodeAt(i) - 48) * weight, 0);
         const rest = sum % 11;
         return rest < 2 ? 0 : 11 - rest;
     };
     return check(12) === Number(cnpj[12]) && check(13) === Number(cnpj[13]);
 }
 function formatCnpj(value) {
-    const d = onlyDigits(value);
-    return d.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+    return normalizeCnpj(value).replace(/^([A-Z0-9]{2})([A-Z0-9]{3})([A-Z0-9]{3})([A-Z0-9]{4})(\d{2})$/, '$1.$2.$3/$4-$5');
 }
 function formatPhone(phone) {
     if (!phone || !phone.number)
@@ -48,6 +49,11 @@ function formatPhone(phone) {
 function mapOffice(office) {
     const company = office.company || {};
     const address = office.address || {};
+    const phones = Array.isArray(office.phones) ? office.phones : [];
+    const phone = phones.find((contact) => onlyDigits(contact?.number));
+    let establishmentType = '';
+    if (typeof office.head === 'boolean')
+        establishmentType = office.head ? 'matriz' : 'filial';
     const addressLine = [
         [address.street, address.number].filter(Boolean).join(', '),
         address.details,
@@ -60,9 +66,10 @@ function mapOffice(office) {
         company: company.name || office.alias || '',
         alias: office.alias || '',
         email: (office.emails && office.emails[0] && office.emails[0].address) || '',
-        phone: formatPhone(office.phones && office.phones[0]),
+        phone: formatPhone(phone),
         status: (office.status && office.status.text) || '',
-        address: addressLine
+        address: addressLine,
+        establishmentType
     };
 }
 function takeRateSlot() {
@@ -75,9 +82,9 @@ function takeRateSlot() {
     return 0;
 }
 async function lookup(rawCnpj) {
-    const cnpj = onlyDigits(rawCnpj);
+    const cnpj = normalizeCnpj(rawCnpj);
     if (!isValidCnpj(cnpj))
-        throw new CnpjError(400, 'CNPJ inválido. Confira os 14 dígitos informados.');
+        throw new CnpjError(400, 'CNPJ inválido. Confira os 14 caracteres informados.');
     const cached = cache.get(cnpj);
     if (cached && cached.expires > Date.now())
         return { ...cached.data, cached: true };
@@ -113,8 +120,7 @@ async function lookup(rawCnpj) {
     }
     if (!office || typeof office !== 'object')
         throw new CnpjError(502, 'Resposta inesperada do serviço de consulta de CNPJ.');
-    const data = mapOffice({ taxId: cnpj, ...office });
-    data.cnpj = formatCnpj(cnpj);
+    const data = mapOffice({ ...office, taxId: cnpj });
     cache.set(cnpj, { data, expires: Date.now() + CACHE_TTL_MS });
     return { ...data, cached: false };
 }

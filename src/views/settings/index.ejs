@@ -1,0 +1,35 @@
+<main id="main-content" class="shell inner-page form-page">
+  <h1>Configurações</h1>
+  <p class="muted">A tarifa é multiplicada pela distância da rota para estimar o gasto de gasolina. Ao salvar alterações, os deslocamentos de todos os clientes são atualizados em segundo plano.</p>
+
+  <% if (!locationsConfigured) { %>
+  <p class="muted" role="status">O cálculo de deslocamentos aguarda a configuração dos serviços de localização e rotas no servidor.</p>
+  <% } %>
+
+  <% if (errors.length) { %>
+  <div class="validation-errors" role="alert">
+    <ul>
+      <% errors.forEach((error) => { %>
+      <li><%= error %></li>
+      <% }) %>
+    </ul>
+  </div>
+  <% } %>
+
+  <form class="settings-form" action="/configuracoes" method="post">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <div class="form-grid">
+      <label class="settings-address-field">
+        Endereço da empresa
+        <input name="originAddress" value="<%= settings.originAddress %>" maxlength="300" required placeholder="Rua, número, bairro, cidade, UF e CEP">
+      </label>
+      <label>
+        Tarifa de gasolina (R$/km)
+        <input name="rate" value="<%= settings.rate %>" inputmode="decimal" maxlength="9" required placeholder="10,00">
+      </label>
+    </div>
+    <div class="form-actions">
+      <button class="button" type="submit">Salvar configurações</button>
+    </div>
+  </form>
+</main>

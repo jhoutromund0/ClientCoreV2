@@ -1,7 +1,9 @@
 const { validationResult } = require('express-validator');
 const Client = require('../models/Client');
+const TransportSettings = require('../models/TransportSettings');
 const cnpjService = require('../services/cnpjService');
-const emptyClient = { name: '', company: '', cnpj: '', email: '', phone: '' };
+const clientTravelService = require('../services/clientTravelService');
+const emptyClient = { name: '', company: '', cnpj: '', email: '', phone: '', address: '', establishmentType: '' };
 function notFound(res) {
     return res.status(404).render('pages/error', {
         title: 'Cliente não encontrado',
@@ -9,21 +11,27 @@ function notFound(res) {
         message: 'Não encontramos o cliente solicitado. Ele pode ter sido excluído.'
     });
 }
+async function renderForm(res, clientData, errors = []) {
+    const editing = Boolean(clientData.id);
+    const travel = editing ? clientTravelService.describe(clientData, await TransportSettings.get()) : null;
+    return res.status(errors.length ? 422 : 200).render('clients/form', {
+        title: editing ? 'Editar cliente' : 'Novo cliente', clientData, errors, travel
+    });
+}
 exports.index = async (req, res) => {
-    res.render('clients/index', { title: 'Clientes', clients: await Client.all() });
+    const [clients, settings] = await Promise.all([Client.all(), TransportSettings.get()]);
+    res.render('clients/index', {
+        title: 'Clientes',
+        clients: clients.map(client => ({ ...client, tripDisplay: clientTravelService.describe(client, settings) }))
+    });
 };
 exports.createForm = async (req, res) => {
-    res.render('clients/form', { title: 'Novo cliente', clientData: { ...emptyClient }, errors: [] });
+    return renderForm(res, { ...emptyClient });
 };
 exports.create = async (req, res) => {
     const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-        return res.status(422).render('clients/form', {
-            title: 'Novo cliente',
-            clientData: { ...emptyClient, ...req.body },
-            errors: errors.array()
-        });
-    }
+    if (!errors.isEmpty())
+        return renderForm(res, { ...emptyClient, ...req.body, id: undefined }, errors.array());
     await Client.create(req.body);
     req.app.locals.flash = { type: 'success', message: 'Cliente cadastrado com sucesso.' };
     res.redirect('/clientes');
@@ -32,20 +40,15 @@ exports.editForm = async (req, res) => {
     const client = await Client.find(req.params.id);
     if (!client)
         return notFound(res);
-    res.render('clients/form', { title: 'Editar cliente', clientData: client, errors: [] });
+    return renderForm(res, client);
 };
 exports.update = async (req, res) => {
     const client = await Client.find(req.params.id);
     if (!client)
         return notFound(res);
     const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-        return res.status(422).render('clients/form', {
-            title: 'Editar cliente',
-            clientData: { ...client, ...req.body, id: client.id },
-            errors: errors.array()
-        });
-    }
+    if (!errors.isEmpty())
+        return renderForm(res, { ...client, ...req.body, id: client.id, travel: client.travel }, errors.array());
     await Client.update(client.id, req.body);
     req.app.locals.flash = { type: 'success', message: 'Cliente atualizado com sucesso.' };
     res.redirect('/clientes');
