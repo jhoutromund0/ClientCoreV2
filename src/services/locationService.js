@@ -1,3 +1,5 @@
+const { setTimeout: delay } = require('node:timers/promises');
+
 const PUBLIC_HOSTS = new Set([
     'nominatim.openstreetmap.org',
     'routing.openstreetmap.de',
@@ -5,7 +7,19 @@ const PUBLIC_HOSTS = new Set([
     'map.project-osrm.org',
     'test.project-osrm.org'
 ]);
-const LOCATION_URLS = ['NOMINATIM_BASE_URL', 'OSRM_BASE_URL'];
+const LOCATION_SERVICES = {
+    NOMINATIM_BASE_URL: 'Nominatim',
+    OSRM_BASE_URL: 'OSRM'
+};
+const PUBLIC_ENDPOINTS = {
+    NOMINATIM_BASE_URL: 'https://nominatim.openstreetmap.org',
+    OSRM_BASE_URL: 'https://routing.openstreetmap.de/routed-car'
+};
+const PUBLIC_INTERVAL_MS = 1050;
+const PUBLIC_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const PUBLIC_CACHE_LIMIT = 500;
+const publicCache = new Map();
+const publicCooldown = new Map();
 const TIMEOUT_MS = 8000;
 const USER_AGENT = 'ClientCoreV2/1.0 (+https://github.com/jhoutromund0/ClientCoreV2)';
 const STATES = {
@@ -36,11 +50,13 @@ function baseUrl(variable) {
         url = new URL(process.env[variable]);
     }
     catch {
-        throw new LocationError(`Configure ${variable} com o endereço do serviço de localização.`, 503);
+        throw new LocationError(`Configure ${variable} com a URL-base do ${LOCATION_SERVICES[variable]}.`, 503);
     }
     const hostname = url.hostname.replace(/\.$/, '');
     if (hostname === 'example' || hostname.endsWith('.example'))
         throw new LocationError(`Substitua o endereço de exemplo em ${variable} pela URL-base do seu serviço.`, 503);
+    if (['openstreetmap.org', 'www.openstreetmap.org', 'api.openstreetmap.org'].includes(hostname))
+        throw new LocationError(`Configure ${variable} com a URL-base de uma instância do ${LOCATION_SERVICES[variable]}.`, 503);
     if (PUBLIC_HOSTS.has(hostname))
         throw new LocationError(`Use uma instância própria ou contratada em ${variable} para consultar endereços em lote.`, 503);
     if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password || url.hash)
@@ -50,7 +66,7 @@ function baseUrl(variable) {
 
 function configurationErrors() {
     const errors = [];
-    for (const variable of LOCATION_URLS) {
+    for (const variable of Object.keys(LOCATION_SERVICES)) {
         try {
             baseUrl(variable);
         } catch (error) {
@@ -62,18 +78,18 @@ function configurationErrors() {
 
 const isConfigured = () => configurationErrors().length === 0;
 
-function endpoint(variable, path, params) {
-    const url = baseUrl(variable);
+function endpoint(variable, path, params, publicLookup) {
+    const url = publicLookup ? new URL(PUBLIC_ENDPOINTS[variable]) : baseUrl(variable);
     url.pathname = `${url.pathname.replace(/\/+$/, '')}/${path}`;
     for (const [name, value] of Object.entries(params))
         url.searchParams.set(name, value);
     return url;
 }
 
-async function requestJson(url) {
+async function requestJson(url, userAgent = process.env.OSM_USER_AGENT || USER_AGENT) {
     try {
         const response = await fetch(url, {
-            headers: { Accept: 'application/json', 'User-Agent': process.env.OSM_USER_AGENT || USER_AGENT },
+            headers: { Accept: 'application/json', 'User-Agent': userAgent },
             signal: AbortSignal.timeout(TIMEOUT_MS),
             redirect: 'error'
         });
@@ -95,6 +111,37 @@ async function requestJson(url) {
     }
 }
 
+// O cálculo público mantém o lock do PostgreSQL até a última chamada e seu intervalo terminarem.
+async function requestPublicJson(url) {
+    const remaining = Math.ceil(((publicCooldown.get(url.host) ?? 0) - Date.now()) / 1000);
+    if (remaining > 0)
+        throw new LocationError('O serviço público atingiu o limite de consultas.', 429, remaining);
+    const started = performance.now();
+    try {
+        return await requestJson(url, USER_AGENT);
+    } catch (error) {
+        if (error.retryAfter || error.status === 503)
+            publicCooldown.set(url.host, Date.now() + (error.retryAfter || 60) * 1000);
+        throw error;
+    } finally {
+        const wait = PUBLIC_INTERVAL_MS - (performance.now() - started);
+        if (wait > 0)
+            await delay(Math.ceil(wait));
+    }
+}
+
+async function cachePublic(key, lookup) {
+    const cached = publicCache.get(key);
+    if (cached && cached.expires > Date.now())
+        return cached.value;
+    const value = await lookup();
+    publicCache.delete(key);
+    if (publicCache.size >= PUBLIC_CACHE_LIMIT)
+        publicCache.delete(publicCache.keys().next().value);
+    publicCache.set(key, { value, expires: Date.now() + PUBLIC_CACHE_TTL_MS });
+    return value;
+}
+
 const normalize = (value) => value.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 const expandStreet = (value) => value.replace(/^([a-zç]{1,4})\.?\s+/i, (prefix, word) => {
     const street = STREET_PREFIXES[normalize(word)];
@@ -102,7 +149,7 @@ const expandStreet = (value) => value.replace(/^([a-zç]{1,4})\.?\s+/i, (prefix,
 });
 const streetKey = (value) => normalize(expandStreet(value)).replace(/[^a-z0-9]+/g, ' ').trim();
 
-function addressQueries(address) {
+function addressQueries(address, publicLookup) {
     const segments = address.trim().split(/\s+-\s+/);
     const municipality = segments.findIndex((segment) => /\/[a-z]{2}$/i.test(segment));
     // A resposta do CNPJá põe complemento e bairro entre o número e o município/UF.
@@ -129,7 +176,9 @@ function addressQueries(address) {
     const simplified = uf > 1 ? [parts[0], ...parts.slice(uf - 1, uf + 1)] : parts.filter((part) => !/^\d{5}-\d{3}$/.test(part));
     if (parts.length < 2)
         return null;
-    const queries = new Set([parts.join(', ')]);
+    const postalCode = parts.find(part => /^\d{5}-\d{3}$/.test(part));
+    const firstQuery = publicLookup && uf > 1 ? [...simplified, postalCode].filter(Boolean) : parts;
+    const queries = new Set([firstQuery.join(', ')]);
     if (simplified.length >= 2)
         queries.add(simplified.join(', '));
     const city = uf > 1 ? normalize(parts[uf - 1]) : '';
@@ -168,16 +217,16 @@ function matchAddress(place, requested) {
     return validCoordinates(point) ? { point, exact } : null;
 }
 
-async function geocode(address) {
-    const requested = typeof address === 'string' && addressQueries(address);
+async function geocode(address, publicLookup = false) {
+    const requested = typeof address === 'string' && addressQueries(address, publicLookup);
     if (!requested)
         return null;
     let streetPoint = null;
     for (const query of requested.queries) {
         const url = endpoint('NOMINATIM_BASE_URL', 'search', {
             q: query, format: 'jsonv2', addressdetails: '1', countrycodes: 'br', limit: '5', 'accept-language': 'pt-BR'
-        });
-        const response = await requestJson(url);
+        }, publicLookup);
+        const response = await (publicLookup ? requestPublicJson(url) : requestJson(url));
         if (!response.ok || !Array.isArray(response.data))
             throw new LocationError('O serviço de geocodificação retornou uma resposta inesperada.', 502);
         for (const place of response.data) {
@@ -191,47 +240,48 @@ async function geocode(address) {
 }
 
 const coordinateString = (point) => `${point.lon},${point.lat}`;
-const validDistance = (value) => Number.isFinite(value) && value >= 0;
-const noRoute = (data) => ['NoTable', 'NoRoute', 'NoSegment'].includes(data?.code);
-const routeResponseError = () => new LocationError('O serviço de rotas retornou uma resposta inesperada.', 502);
 
-async function routeDistance(origin, destination) {
-    const url = endpoint('OSRM_BASE_URL', `route/v1/driving/${origin};${destination}`, { overview: 'false', steps: 'false' });
-    const { ok, data } = await requestJson(url);
-    if (noRoute(data))
+async function routeDistance(origin, destination, publicLookup) {
+    const url = endpoint('OSRM_BASE_URL', `route/v1/driving/${origin};${destination}`, { overview: 'false', steps: 'false' }, publicLookup);
+    const { ok, data } = await (publicLookup ? requestPublicJson(url) : requestJson(url));
+    if (data?.code === 'NoRoute' || data?.code === 'NoSegment')
         return null;
     const distance = data?.routes?.[0]?.distance;
-    if (!ok || data?.code !== 'Ok' || !validDistance(distance))
-        throw routeResponseError();
+    if (!ok || data?.code !== 'Ok' || !Number.isFinite(distance) || distance < 0)
+        throw new LocationError('O serviço de rotas retornou uma resposta inesperada.', 502);
     return distance;
 }
 
-async function drivingDistances(origin, destination) {
+async function drivingDistances(origin, destination, publicLookup = false) {
     if (!validCoordinates(origin) || !validCoordinates(destination))
         return null;
     const from = coordinateString(origin);
     const to = coordinateString(destination);
-    const url = endpoint('OSRM_BASE_URL', `table/v1/driving/${from};${to}`, { annotations: 'distance' });
-    const { ok, data } = await requestJson(url);
-    if (noRoute(data))
+    const samePoint = from === to;
+
+    const outboundMeters = samePoint ? 0 : await routeDistance(from, to, publicLookup);
+    if (outboundMeters === null)
         return null;
-    if (data?.code === 'NotImplemented' || (ok && data?.code === 'Ok' && !data.distances)) {
-        // Versões antigas do OSRM podem oferecer somente duração na matriz.
-        const outboundMeters = await routeDistance(from, to);
-        if (outboundMeters === null)
-            return null;
-        const returnMeters = await routeDistance(to, from);
-        return returnMeters === null ? null : { outboundMeters, returnMeters };
-    }
-    const outboundMeters = data?.distances?.[0]?.[1];
-    const returnMeters = data?.distances?.[1]?.[0];
-    if (!ok || data?.code !== 'Ok')
-        throw routeResponseError();
-    if (outboundMeters === null || returnMeters === null)
+    const returnMeters = samePoint ? 0 : await routeDistance(to, from, publicLookup);
+    if (returnMeters === null)
         return null;
-    if (!validDistance(outboundMeters) || !validDistance(returnMeters))
-        throw routeResponseError();
-    return { outboundMeters, returnMeters };
+    return {
+        outboundMeters,
+        returnMeters,
+        outboundKm: outboundMeters / 1000,
+        returnKm: returnMeters / 1000,
+        roundTripKm: (outboundMeters + returnMeters) / 1000
+    };
 }
 
-module.exports = { geocode, drivingDistances, isConfigured, configurationErrors, LocationError };
+const publicServices = {
+    geocode: (address) => cachePublic(`address:${address}`, () => geocode(address, true)),
+    drivingDistances: (origin, destination) => {
+        if (!validCoordinates(origin) || !validCoordinates(destination))
+            return null;
+        return cachePublic(`route:${coordinateString(origin)};${coordinateString(destination)}`,
+            () => drivingDistances(origin, destination, true));
+    }
+};
+
+module.exports = { geocode, drivingDistances, publicServices, isConfigured, configurationErrors, LocationError };

@@ -1,9 +1,8 @@
 const TransportSettings = require('../models/TransportSettings');
-const location = require('../services/locationService');
 
 function renderForm(res, settings, errors = []) {
     return res.status(errors.length ? 422 : 200).render('settings/index', {
-        title: 'Configurações', settings, errors, routeErrors: location.configurationErrors()
+        title: 'Configurações', settings, errors
     });
 }
 

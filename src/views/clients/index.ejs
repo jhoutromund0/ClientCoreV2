@@ -44,7 +44,7 @@
           <th>
             Deslocamento
           </th>
-          <th>
+          <th class="client-actions-column" scope="col">
             Ações
           </th>
         </tr>
@@ -78,19 +78,21 @@
           <td>
             <% if (client.tripDisplay) { %>
             <%- include('travel', { trip: client.tripDisplay }) %>
+            <% if (client.tripDisplay.canCalculate) { %>
+            <a class="travel-calculate-link" href="/clientes/<%= client.id %>/editar#travel-heading">Calcular quilometragem</a>
+            <% } %>
             <% } else { %>
             —
             <% } %>
           </td>
-          <td class="actions">
-            <a href="/clientes/<%= client.id %>/editar">Editar
-            </a>
-            <form action="/clientes/<%= client.id %>/excluir" method="post" data-confirm="Excluir este cliente?">
-              <%- include('../partials/csrf-field') %>
-              <button class="text-button danger" type="submit">
-                Excluir
-              </button>
-            </form>
+          <td class="client-actions-column">
+            <div class="actions">
+              <a href="/clientes/<%= client.id %>/editar">Editar</a>
+              <form action="/clientes/<%= client.id %>/excluir" method="post" data-confirm="Excluir este cliente?">
+                <%- include('../partials/csrf-field') %>
+                <button class="text-button danger" type="submit">Excluir</button>
+              </form>
+            </div>
           </td>
         </tr>
         <% }) %>
@@ -115,6 +117,10 @@
   <% } %>
   <%- include('../partials/pagination', { page, path: '/clientes' }) %>
   <% if (clients.length) { %>
-  <p class="storage-note"><a class="travel-attribution" href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a></p>
+  <p class="storage-note">
+    <a class="travel-attribution" href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a> ·
+    <a class="travel-attribution" href="https://project-osrm.org/">OSRM</a> ·
+    <a class="travel-attribution" href="https://www.openstreetmap.org/fixthemap">Corrigir o mapa</a>
+  </p>
   <% } %>
 </main>

@@ -21,6 +21,7 @@ router.get('/novo', wrap(clients.createForm));
 router.get('/consulta-cnpj/:cnpj', wrap(clients.lookupCnpj));
 router.post('/', validateClient, wrap(clients.create));
 router.get('/:id/editar', wrap(clients.editForm));
+router.post('/:id/deslocamento', wrap(clients.calculateTravel));
 router.post('/:id', validateClient, wrap(clients.update));
 router.post('/:id/excluir', wrap(clients.remove));
 module.exports = router;

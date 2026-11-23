@@ -3,6 +3,7 @@ const Client = require('../models/Client');
 const TransportSettings = require('../models/TransportSettings');
 const cnpjService = require('../services/cnpjService');
 const clientTravelService = require('../services/clientTravelService');
+const location = require('../services/locationService');
 const emptyClient = { name: '', company: '', cnpj: '', email: '', phone: '', address: '', establishmentType: '' };
 function notFound(res) {
     return res.status(404).render('pages/error', {
@@ -13,9 +14,11 @@ function notFound(res) {
 }
 async function renderForm(res, clientData, errors = []) {
     const editing = Boolean(clientData.id);
-    const travel = editing ? clientTravelService.describe(clientData, await TransportSettings.get()) : null;
+    const transportSettings = editing ? await TransportSettings.get() : null;
+    const travel = editing ? clientTravelService.describe(clientData, transportSettings) : null;
     return res.status(errors.length ? 422 : 200).render('clients/form', {
-        title: editing ? 'Editar cliente' : 'Novo cliente', clientData, errors, travel
+        title: editing ? 'Editar cliente' : 'Novo cliente', clientData, errors, travel, transportSettings,
+        publicLookup: editing && !location.isConfigured()
     });
 }
 exports.index = async (req, res) => {
@@ -48,6 +51,20 @@ exports.editForm = async (req, res) => {
     if (!client)
         return notFound(res);
     return renderForm(res, client);
+};
+exports.calculateTravel = async (req, res) => {
+    const { id } = req.params;
+    const { publicUse, expectedAddress, expectedRevision } = req.body || {};
+    const result = await clientTravelService.calculateClientTravel(id, {
+        publicUse: publicUse === 'yes',
+        expectedAddress: typeof expectedAddress === 'string' ? expectedAddress : '',
+        expectedRevision: typeof expectedRevision === 'string' ? expectedRevision : ''
+    });
+    if (!result)
+        return notFound(res);
+    await req.setFlash(result);
+    const anchor = result.type === 'success' ? '#travel-heading' : '';
+    return res.redirect(303, `/clientes/${id}/editar${anchor}`);
 };
 exports.update = async (req, res) => {
     const client = await Client.find(req.params.id);

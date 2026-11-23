@@ -39,14 +39,9 @@ function snapshot(visit, settings) {
     const distances = manual ? visit.manualTravel : routeDistances(visit, settings);
     if (!hasDistances(distances))
         return null;
-    const outboundMeters = Math.round(distances.outboundMeters);
-    const roundTripMeters = Math.round(distances.roundTripMeters);
+    const { outboundMeters, roundTripMeters } = distances;
     const payment = reimbursement(visit, settings);
-    const rate = payment.rateCentsPerKm;
-    const calculated = Number.isSafeInteger(rate) && rate >= 0
-        ? Number((BigInt(roundTripMeters) * BigInt(rate) + 500n) / 1000n)
-        : null;
-    const costCents = Number.isSafeInteger(calculated) ? calculated : null;
+    const costCents = clientTravel.travelCostCents(roundTripMeters, payment.rateCentsPerKm);
     return {
         originAddress: settings.originAddress,
         destinationAddress: visit.address,

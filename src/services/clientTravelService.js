@@ -10,7 +10,7 @@ const statuses = {
     address_not_found: 'Endereço do cliente não localizado. Confira o cadastro.',
     origin_not_found: 'Endereço da empresa não localizado. Confira as configurações.',
     route_not_found: 'Rota de carro indisponível para este endereço.',
-    temporarily_unavailable: 'Serviço de rotas indisponível. O cálculo será tentado novamente.'
+    temporarily_unavailable: 'Serviço de rotas indisponível. Tente novamente mais tarde.'
 };
 
 function describe(client, settings, addressError = statuses.address_not_found) {
@@ -23,11 +23,15 @@ function describe(client, settings, addressError = statuses.address_not_found) {
         return {
             statusMessage: location.isConfigured()
                 ? 'Cálculo de deslocamento pendente.'
-                : 'Cálculo de deslocamento indisponível no momento.'
+                : 'Quilometragem a calcular.',
+            canCalculate: true
         };
     }
     if (travel.status !== 'ready')
-        return { statusMessage: travel.status === 'address_not_found' ? addressError : (statuses[travel.status] || 'Cálculo de deslocamento pendente.') };
+        return {
+            statusMessage: travel.status === 'address_not_found' ? addressError : (statuses[travel.status] || 'Cálculo de deslocamento pendente.'),
+            canCalculate: true
+        };
 
     return {
         statusMessage: travel.outboundCostCents == null ? 'Tarifa por km pendente.' : '',
@@ -36,6 +40,17 @@ function describe(client, settings, addressError = statuses.address_not_found) {
         outboundCost: travel.outboundCostCents == null ? '' : reais.format(travel.outboundCostCents / 100),
         roundTripCost: travel.roundTripCostCents == null ? '' : reais.format(travel.roundTripCostCents / 100)
     };
+}
+
+function travelCostCents(meters, rate) {
+    if (!Number.isFinite(meters) || meters < 0 || !Number.isSafeInteger(rate) || rate < 0)
+        return null;
+    const millimeters = Math.round(meters * 1000);
+    if (!Number.isSafeInteger(millimeters))
+        return null;
+    const cents = (BigInt(millimeters) * BigInt(rate) + 500000n) / 1000000n;
+    const amount = Number(cents);
+    return Number.isSafeInteger(amount) ? amount : null;
 }
 
 function priceRoute(travel, distances, rate) {
@@ -47,9 +62,30 @@ function priceRoute(travel, distances, rate) {
         outboundMeters,
         returnMeters,
         roundTripMeters,
-        outboundCostCents: rate == null ? null : Math.round(outboundMeters * rate / 1000),
-        roundTripCostCents: rate == null ? null : Math.round(roundTripMeters * rate / 1000)
+        outboundCostCents: travelCostCents(outboundMeters, rate),
+        roundTripCostCents: travelCostCents(roundTripMeters, rate)
     };
+}
+
+function reusableRoute(result, address, originAddress) {
+    return result?.address === address && result.originAddress === originAddress && result.status === 'ready'
+        && Number.isFinite(result.outboundMeters) && Number.isFinite(result.returnMeters);
+}
+
+async function resolveTravel(travel, origin, rate, service) {
+    if (!origin)
+        return { ...travel, status: 'origin_not_found' };
+
+    travel.destination ??= travel.address === travel.originAddress ? origin : await service.geocode(travel.address);
+    if (!travel.destination)
+        return { ...travel, status: 'address_not_found' };
+
+    const distances = await service.drivingDistances(origin, travel.destination);
+    return distances ? priceRoute(travel, distances, rate) : { ...travel, status: 'route_not_found' };
+}
+
+function retryDelay(error) {
+    return Math.min(2147483647, Math.max(60, error.retryAfter || 0) * 1000);
 }
 
 async function processBatch(run) {
@@ -70,8 +106,7 @@ async function processBatch(run) {
         const { address } = record;
         const previous = [record.travel, record.clientTravel].find(result => result?.address === address);
         const reusable = [routes.get(address), record.travel, record.clientTravel].find(result =>
-            result?.address === address && result.originAddress === settings.originAddress && result.status === 'ready' &&
-            Number.isFinite(result.outboundMeters) && Number.isFinite(result.returnMeters));
+            reusableRoute(result, address, settings.originAddress));
         const travel = {
             revision: settings.revision,
             address,
@@ -86,23 +121,12 @@ async function processBatch(run) {
             } else {
                 if (origin === undefined)
                     origin = await location.geocode(settings.originAddress);
-                if (!origin) {
-                    result = { ...travel, status: 'origin_not_found' };
-                } else {
-                    travel.destination ??= address === settings.originAddress ? origin : await location.geocode(address);
-                    if (!travel.destination) {
-                        result = { ...travel, status: 'address_not_found' };
-                    } else {
-                        const distances = await location.drivingDistances(origin, travel.destination);
-                        result = distances ? priceRoute(travel, distances, settings.rateCentsPerKm)
-                            : { ...travel, status: 'route_not_found' };
-                    }
-                }
+                result = await resolveTravel(travel, origin, settings.rateCentsPerKm, location);
             }
         } catch (error) {
             if (!(error instanceof location.LocationError))
                 throw error;
-            const delay = Math.min(2147483647, Math.max(60, error.retryAfter || 0) * 1000);
+            const delay = retryDelay(error);
             await store.saveTravel(record.id, address, {
                 ...travel, status: 'temporarily_unavailable', retryAfter: Date.now() + delay
             }, run);
@@ -116,7 +140,7 @@ async function processBatch(run) {
     return jobs.length ? 1000 : 5000;
 }
 
-async function refreshPendingTravel() {
+async function withTravelLock(work, busy) {
     // A sessão que segura o lock fica reservada até o lote terminar.
     const connection = await pool.connect();
     const lockKey = 'clientcore.transport';
@@ -125,7 +149,7 @@ async function refreshPendingTravel() {
     try {
         const { rows } = await connection.query('SELECT pg_try_advisory_lock(hashtext($1)) AS locked', [lockKey]);
         locked = rows[0].locked;
-        return locked ? await processBatch(connection.query.bind(connection)) : 5000;
+        return locked ? await work(connection.query.bind(connection)) : busy;
     } finally {
         if (locked) {
             try {
@@ -136,6 +160,56 @@ async function refreshPendingTravel() {
         }
         connection.release(releaseError);
     }
+}
+
+function refreshPendingTravel() {
+    return withTravelLock(processBatch, 5000);
+}
+
+async function calculateClientTravel(id, { publicUse, expectedAddress, expectedRevision }) {
+    const changed = { type: 'error', message: 'Os dados do deslocamento mudaram. Confira os endereços e tente novamente.' };
+    const busy = { type: 'info', message: 'Há outro deslocamento em cálculo. Tente novamente em instantes.' };
+    return withTravelLock(async run => {
+        const client = await Client.find(id, run);
+        if (!client)
+            return null;
+        const { address, travel: previous } = client;
+        if (!address)
+            return { type: 'error', message: 'Cadastre o endereço do cliente antes de calcular a quilometragem.' };
+        const settings = await TransportSettings.get(run);
+        const { originAddress, revision, rateCentsPerKm } = settings;
+        if (expectedAddress !== address || expectedRevision !== revision)
+            return changed;
+
+        const reusable = reusableRoute(previous, address, originAddress);
+        const publicLookup = !location.isConfigured();
+        const sameRoute = previous?.address === address && previous.originAddress === originAddress;
+        if (!reusable && publicLookup && !publicUse)
+            return { type: 'error', message: 'Confirme que os endereços são públicos e a consulta é para uso não comercial.' };
+        if (sameRoute && previous.status === 'temporarily_unavailable' && previous.retryAfter > Date.now())
+            return { type: 'error', message: statuses.temporarily_unavailable };
+
+        const travel = { address, originAddress, revision, destination: sameRoute ? previous.destination : null };
+        let result;
+        try {
+            if (reusable) {
+                result = priceRoute(travel, previous, rateCentsPerKm);
+            } else {
+                const service = publicLookup ? location.publicServices : location;
+                const origin = await service.geocode(originAddress);
+                result = await resolveTravel(travel, origin, rateCentsPerKm, service);
+            }
+        } catch (error) {
+            if (!(error instanceof location.LocationError))
+                throw error;
+            result = { ...travel, status: 'temporarily_unavailable', retryAfter: Date.now() + retryDelay(error) };
+        }
+        if (!await Client.saveTravel(id, address, result, run))
+            return changed;
+        if (result.status === 'ready')
+            return { type: 'success', message: 'Quilometragem do cliente calculada.' };
+        return { type: 'error', message: statuses[result.status] };
+    }, busy);
 }
 
 function start() {
@@ -164,4 +238,4 @@ function start() {
     };
 }
 
-module.exports = { describe, refreshPendingTravel, start };
+module.exports = { describe, calculateClientTravel, refreshPendingTravel, start, travelCostCents };

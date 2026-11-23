@@ -16,8 +16,8 @@ module.exports = class Client {
         const page = await store.byName('clients', { after });
         return { ...page, items: page.items.map(client => ({ ...client, ...clean(client) })) };
     }
-    static async find(id) {
-        const client = await store.find('clients', id);
+    static async find(id, run) {
+        const client = await store.find('clients', id, run);
         return client && { ...client, ...clean(client) };
     }
     static create(d) { return store.create('clients', { ...clean(d), createdAt: new Date().toISOString() }); }
@@ -74,7 +74,7 @@ module.exports = class Client {
         const { rowCount } = await run(`
             UPDATE clients
             SET data = jsonb_set(data, '{travel}', $3::jsonb)
-            WHERE id = $1 AND data->>'address' = $2 AND jsonb_typeof(data->'name') = 'string'
+            WHERE id = $1 AND btrim(data->>'address') = btrim($2) AND jsonb_typeof(data->'name') = 'string'
                 AND name_key <> '' AND (cnpj_key IS NULL OR cnpj_key ~ '^[A-Z0-9]{12}[0-9]{2}$')
                 AND COALESCE((SELECT revision::text FROM transport_settings WHERE id FOR SHARE), $4) = $5
         `, [id, address, JSON.stringify(travel), initialRevision, travel.revision]);

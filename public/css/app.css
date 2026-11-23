@@ -630,6 +630,14 @@ tbody tr:last-child td {
 .actions form {
   margin:0
 }
+.client-actions-column {
+  width:1%;
+  text-align:center;
+  white-space:nowrap
+}
+.client-actions-column .actions {
+  display:inline-flex
+}
 .text-button {
   border:0;
   background:none;
@@ -671,9 +679,8 @@ tbody tr:last-child td {
   color:#b5aa98;
   margin-top:18px
 }
-.travel-summary h2 {
-  margin:0 0 8px;
-  font-size:16px
+.travel-summary {
+  margin-top:20px
 }
 .travel-distances {
   display:grid;
@@ -702,6 +709,34 @@ td .travel-status {
 }
 .travel-attribution {
   text-decoration:underline
+}
+.travel-addresses {
+  grid-template-columns:max-content minmax(0,1fr);
+  margin-top:16px
+}
+.travel-addresses dd {
+  overflow-wrap:anywhere
+}
+.travel-calculate-link {
+  display:inline-block;
+  margin-top:6px;
+  text-decoration:underline
+}
+.travel-lookup {
+  margin-top:16px
+}
+.travel-lookup-confirmation {
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+  font-size:13px
+}
+.travel-lookup-confirmation input {
+  margin:2px 0 0;
+  accent-color:var(--green)
+}
+.travel-lookup .storage-note {
+  margin:6px 0 12px
 }
 .back-link {
   display:block;

@@ -64,15 +64,6 @@
       </label>
     </div>
     <p class="lookup-status" id="cnpj-status" role="status"></p>
-    <section class="travel-summary" aria-labelledby="travel-heading">
-      <h2 id="travel-heading">Deslocamento</h2>
-      <% if (clientData.id && typeof travel !== 'undefined' && travel) { %>
-      <%- include('travel', { trip: travel }) %>
-      <% } else { %>
-      <p class="travel-status">A distância e o gasto estimado são calculados após salvar o endereço.</p>
-      <% } %>
-      <p class="storage-note"><a class="travel-attribution" href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a></p>
-    </section>
     <div class="form-actions">
       <a class="button button-ghost" href="/clientes">
         Cancelar
@@ -83,4 +74,37 @@
       </button>
     </div>
   </form>
+  <% if (clientData.id && travel && !errors.length) { %>
+  <section class="panel travel-summary" aria-labelledby="travel-heading">
+    <h2 id="travel-heading" tabindex="-1">Deslocamento</h2>
+    <%- include('travel', { trip: travel }) %>
+    <% if (travel.canCalculate) { %>
+    <dl class="travel-distances travel-addresses">
+      <dt>Endereço base</dt><dd><%= transportSettings.originAddress %></dd>
+      <dt>Endereço do cliente</dt><dd><%= clientData.address %></dd>
+    </dl>
+    <form class="travel-lookup" action="/clientes/<%= clientData.id %>/deslocamento" method="post">
+      <%- include('../partials/csrf-field') %>
+      <input type="hidden" name="expectedAddress" value="<%= clientData.address %>">
+      <input type="hidden" name="expectedRevision" value="<%= transportSettings.revision %>">
+      <% if (publicLookup) { %>
+      <label class="travel-lookup-confirmation">
+        <input type="checkbox" name="publicUse" value="yes" required>
+        <span>Confirmo que os dois endereços são públicos e que a consulta é para uso não comercial.</span>
+      </label>
+      <p class="storage-note">
+        <a class="travel-attribution" href="https://operations.osmfoundation.org/policies/nominatim/">Política do Nominatim</a> ·
+        <a class="travel-attribution" href="https://routing.openstreetmap.de/about.html#usage-policy">Regras do OSRM público</a>
+      </p>
+      <% } %>
+      <button class="button button-ghost" type="submit">Calcular quilometragem</button>
+    </form>
+    <% } %>
+    <p class="storage-note">
+      <a class="travel-attribution" href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a> ·
+      <a class="travel-attribution" href="https://project-osrm.org/">OSRM</a> ·
+      <a class="travel-attribution" href="https://www.openstreetmap.org/fixthemap">Corrigir o mapa</a>
+    </p>
+  </section>
+  <% } %>
 </main>

@@ -1,15 +1,8 @@
 <main id="main-content" class="shell inner-page form-page">
   <h1>Configurações</h1>
   <%- include('nav', { section: 'travel' }) %>
+  <p class="muted">O endereço base é o ponto de partida para a opção <strong>Calcular quilometragem</strong> na lista de clientes.</p>
   <p class="muted">O valor do deslocamento considera a distância de ida e volta. Quando o responsável tem uma tarifa individual, ela é usada na visita.</p>
-
-  <% if (routeErrors.length) { %>
-  <div class="validation-errors" role="status">
-    <strong>Configuração do cálculo automático</strong>
-    <ul><% routeErrors.forEach(error => { %><li><%= error %></li><% }) %></ul>
-    <p>A quilometragem pode ser informada manualmente na visita.</p>
-  </div>
-  <% } %>
 
   <% if (errors.length) { %>
   <div class="validation-errors" role="alert">
@@ -25,7 +18,7 @@
     <%- include('../partials/csrf-field') %>
     <div class="form-grid">
       <label class="settings-address-field">
-        Endereço da empresa
+        Endereço base da empresa
         <input name="originAddress" value="<%= settings.originAddress %>" maxlength="300" required placeholder="Rua, número, bairro, cidade, UF e CEP">
       </label>
       <label>
