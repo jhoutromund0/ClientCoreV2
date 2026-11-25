@@ -104,11 +104,12 @@ exports.createUser = async (req, res) => {
     const creationForm = {
         name: typeof req.body?.name === 'string' ? req.body.name.slice(0, 120) : '',
         email: typeof req.body?.email === 'string' ? req.body.email.slice(0, 254) : '',
+        role: req.body?.role === 'admin' ? 'admin' : 'analista',
         generateLink
     };
     const invalidCreation = (error, status = 422) => renderUsers(req, res, { error, status, creationForm });
     const form = await input.newAccount(req.body);
-    if (!form) return invalidCreation('Informe um nome válido e confira o e-mail, se preenchido.');
+    if (!form) return invalidCreation('Confira o nome, o perfil e o e-mail, se preenchido.');
     const origin = generateLink ? auth.linkOrigin(req) : null;
     if (generateLink && !origin)
         return invalidCreation(missingLinkOrigin.error, missingLinkOrigin.status);

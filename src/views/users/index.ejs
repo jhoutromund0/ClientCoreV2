@@ -40,6 +40,12 @@
         <label>E-mail (opcional)
           <input name="email" type="email" value="<%= creationForm?.email || '' %>" maxlength="254">
         </label>
+        <label>Perfil
+          <select name="role">
+            <option value="analista">Analista</option>
+            <option value="admin"<% if (creationForm?.role === 'admin') { %> selected<% } %>>Administrador</option>
+          </select>
+        </label>
         <label class="checkbox-field">
           <input type="checkbox" name="generate_link" value="1"<% if (creationForm?.generateLink) { %> checked<% } %>>
           Gerar link de acesso (opcional)

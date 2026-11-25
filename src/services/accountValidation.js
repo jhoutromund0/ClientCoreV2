@@ -12,12 +12,12 @@ const mileageRate = body('mileageRate').optional().isString().bail().trim()
         const [whole, decimals = ''] = value.split(/[.,]/);
         return Number(whole) * 100 + Number(decimals.padEnd(2, '0'));
     });
-const accountFields = [
+const creationFields = [
     name,
     email,
-    body('role').isString().bail().isIn(['admin', 'analista']),
-    mileageRate
+    body('role').isString().bail().isIn(['admin', 'analista'])
 ];
+const accountFields = [...creationFields, mileageRate];
 
 async function validatedAccount(body, fields) {
     const request = { body };
@@ -29,7 +29,8 @@ async function validatedAccount(body, fields) {
 }
 
 async function newAccount(input) {
-    return validatedAccount({ name: input?.name, email: input?.email, role: 'analista' }, [name, email]);
+    const { name, email, role = 'analista' } = input ?? {};
+    return validatedAccount({ name, email, role }, creationFields);
 }
 
 async function account(input) {
