@@ -26,7 +26,7 @@ async function validate(password, account) {
         return { message: 'Use uma senha de 12 a 200 caracteres.' };
 
     const candidate = normalized(password);
-    const identity = [normalized(account.email.split('@')[0]), normalized(account.name)];
+    const identity = [normalized((account.email || '').split('@')[0]), normalized(account.name)];
     const repeated = /^(.{1,20})\1+$/u;
     if (!candidate || common.test(candidate) || repeated.test(candidate) ||
         sequential.some(sequence => sequence.includes(candidate)) ||

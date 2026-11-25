@@ -5,6 +5,8 @@ const wrap = require('../middleware/asyncHandler');
 router.get('/login', wrap(c.loginPage));
 router.post('/login', wrap(c.login));
 router.post('/sair', a.requireAuth, wrap(c.logout));
+router.get(a.firstLoginPath, a.requireAuth, wrap(c.firstLoginPage));
+router.post(a.firstLoginPath, a.requireAuth, wrap(c.finishFirstLogin));
 router.get('/conta', a.requireAuth, wrap(c.account));
 router.post('/conta/senha', a.requireAuth, wrap(c.changePassword));
 router.post('/conta/sessoes/encerrar', a.requireAuth, wrap(c.endAllSessions));

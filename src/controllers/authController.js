@@ -9,7 +9,7 @@ const usersPath = '/configuracoes/usuarios';
 const accountPath = '/conta';
 const setupPath = '/acesso/definir-senha';
 const invalidLink = 'O link expirou ou já foi usado. Solicite um novo link ao administrador.';
-const invalidCredentials = 'E-mail ou senha inválidos.';
+const invalidCredentials = 'Nome de usuário ou senha inválidos.';
 const invalidAccount = { error: 'Confira nome, e-mail, perfil e tarifa por quilômetro.', status: 422 };
 const unavailableAccount = { error: 'A conta não está disponível.', status: 404 };
 const missingLinkOrigin = { error: 'Configure o endereço público do aplicativo para gerar links.', status: 503 };
@@ -21,6 +21,10 @@ function safeNext(value) {
         /[\x00-\x1f\x7f\\]/.test(value))
         return '/dashboard';
     return value;
+}
+
+function firstLoginUrl(next) {
+    return next === '/dashboard' ? auth.firstLoginPath : auth.firstLoginPath + '?next=' + encodeURIComponent(next);
 }
 
 function renderLogin(res, { next, error = '', status = 200 }) {
@@ -39,16 +43,17 @@ exports.loginPage = (req, res) => req.user ? res.redirect('/dashboard') :
 exports.login = async (req, res) => {
     if (req.user) return res.redirect(303, '/dashboard');
     const next = safeNext(req.body?.next);
-    const email = input.loginAddress(req.body?.email);
+    const name = input.loginName(req.body?.name);
     const password = req.body?.password;
-    const seconds = await throttle.start(req, 'login', email || '');
+    const account = name ? await User.byName(name) : null;
+    const key = account ? 'id:' + account.id : 'name:' + (name || '').toLowerCase();
+    const seconds = await throttle.start(req, 'login', key);
     if (seconds) return renderLogin(res, { next, ...limitResponse(req, res, 'login', seconds) });
-    if (email && passwordPolicy.input(password)) {
-        const account = await User.byEmail(email);
+    if (name && passwordPolicy.input(password)) {
         const valid = await User.verifyPassword(password, account?.active ? account.password_hash : null);
         if (valid && await auth.create(req, res, account)) {
-            await throttle.success('login', email);
-            return res.redirect(303, next);
+            await throttle.success('login', key);
+            return res.redirect(303, account.must_change_password ? firstLoginUrl(next) : next);
         }
     }
     throttle.report(req, 'login_failed');
@@ -79,37 +84,50 @@ function withPasswordConfirmation(render, action) {
     };
 }
 
-async function renderUsers(req, res, { error = null, status = 200, link = null } = {}) {
+async function renderUsers(req, res, { error = null, status = 200, link = null, userCreated = null, creationForm = null } = {}) {
     const page = await User.page(req.query.apos);
-    return res.status(status).render('users/index', { title: 'Usuários do sistema', users: page.items, page, error, link });
+    return res.status(status).render('users/index', {
+        title: 'Usuários do sistema', users: page.items, page, error, link, userCreated, creationForm
+    });
 }
 
-function renderLink(req, res, origin, token, email) {
+function renderLink(req, res, origin, token, { name, email }) {
     const url = new URL(setupPath, origin);
     url.searchParams.set('token', token);
-    return renderUsers(req, res, { link: { url: url.href, email } });
+    return renderUsers(req, res, { link: { url: url.href, name, email } });
 }
 
 exports.users = (req, res) => renderUsers(req, res);
 
-exports.createUser = withPasswordConfirmation(renderUsers, async (req, res, account) => {
-    const form = await input.account(req.body);
-    if (!form) return renderUsers(req, res, invalidAccount);
-    const origin = auth.linkOrigin(req);
-    if (!origin)
-        return renderUsers(req, res, missingLinkOrigin);
+exports.createUser = async (req, res) => {
+    const generateLink = req.body?.generate_link === '1';
+    const creationForm = {
+        name: typeof req.body?.name === 'string' ? req.body.name.slice(0, 120) : '',
+        email: typeof req.body?.email === 'string' ? req.body.email.slice(0, 254) : '',
+        generateLink
+    };
+    const invalidCreation = (error, status = 422) => renderUsers(req, res, { error, status, creationForm });
+    const form = await input.newAccount(req.body);
+    if (!form) return invalidCreation('Informe um nome válido e confira o e-mail, se preenchido.');
+    const origin = generateLink ? auth.linkOrigin(req) : null;
+    if (generateLink && !origin)
+        return invalidCreation(missingLinkOrigin.error, missingLinkOrigin.status);
 
     try {
-        const token = await User.createInvited(form, account);
-        if (!token)
-            return renderUsers(req, res, { error: 'Confirme seu acesso de administrador novamente.', status: 409 });
-        return renderLink(req, res, origin, token, form.email);
+        const credentials = await User.createManaged(form, { id: req.user.id, sessionHash: req.session.hash }, generateLink);
+        if (!credentials)
+            return invalidCreation('Entre novamente com sua conta de administrador.', 409);
+        if (credentials.token)
+            return renderLink(req, res, origin, credentials.token, form);
+        return renderUsers(req, res, { userCreated: { name: form.name, temporaryPassword: credentials.temporaryPassword } });
     } catch (error) {
-        if (error.code === '23505')
-            return renderUsers(req, res, { error: 'Não foi possível criar a conta com os dados informados.', status: 422 });
+        if (error.code === '23505' && error.constraint === 'users_login_name_unique')
+            return invalidCreation('Já existe uma conta com esse nome de usuário.');
+        if (error.code === '23505' && error.constraint === 'users_email_key')
+            return invalidCreation('Já existe uma conta com esse e-mail.');
         throw error;
     }
-});
+};
 
 exports.updateUser = withPasswordConfirmation(renderUsers, async (req, res, account) => {
     const id = req.params.id;
@@ -181,7 +199,7 @@ exports.recoverUser = withPasswordConfirmation(renderUsers, async (req, res, acc
     const issued = await User.issuePasswordLink(id, account);
     if (!issued)
         return renderUsers(req, res, unavailableAccount);
-    return renderLink(req, res, origin, issued.token, issued.email);
+    return renderLink(req, res, origin, issued.token, issued);
 });
 
 async function renderAccount(req, res, { error = null, status = 200 } = {}) {
@@ -229,9 +247,33 @@ exports.endAllSessions = async (req, res) => {
     return res.redirect(303, '/login');
 };
 
-function renderSetup(res, { token = null, error = null, status = 200 } = {}) {
-    return res.status(status).render('users/password', { title: 'Definir senha', token, error });
+function renderSetup(res, { token = null, error = null, status = 200, firstLogin = false, next = null } = {}) {
+    return res.status(status).render('users/password', {
+        title: firstLogin ? 'Trocar senha temporária' : 'Definir senha', token, error, firstLogin, next
+    });
 }
+
+exports.firstLoginPage = (req, res) => req.user.mustChangePassword
+    ? renderSetup(res, { firstLogin: true, next: safeNext(req.query.next) })
+    : res.redirect('/dashboard');
+
+exports.finishFirstLogin = async (req, res) => {
+    if (!req.user.mustChangePassword) return res.redirect(303, '/dashboard');
+    const next = safeNext(req.body?.next);
+    const render = issue => renderSetup(res, { firstLogin: true, next, ...issue });
+    const account = await User.activeById(req.user.id);
+    if (!account?.must_change_password) return res.redirect(303, '/dashboard');
+    const seconds = await throttle.start(req, 'password_setup', account.id);
+    if (seconds) return render(limitResponse(req, res, 'password_setup', seconds));
+    const issue = await validatePassword(req, account);
+    if (issue) return render(issue);
+    if (await User.verifyPassword(req.body.password, account.password_hash))
+        return render({ error: 'Escolha uma senha diferente da temporária.', status: 422 });
+    if (!await auth.rotate(req, res, (currentHash, newHash) => User.finishFirstLogin(account, req.body.password, currentHash, newHash)))
+        return render({ error: 'A conta foi alterada. Entre novamente para trocar a senha.', status: 409 });
+    await throttle.success('password_setup', account.id);
+    return res.redirect(303, next);
+};
 
 function findPasswordLink(token) {
     if (typeof token !== 'string' || !/^[a-f0-9]{64}$/.test(token)) return null;

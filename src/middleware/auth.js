@@ -12,6 +12,7 @@ const renderTerminatesHttps = secure && process.env.RENDER === 'true';
 const cookieOptions = { httpOnly: true, secure, sameSite: 'lax', path: '/' };
 const cookieName = secure ? '__Host-cc_session' : 'cc_session';
 const formCookieName = secure ? '__Host-cc_form' : 'cc_form';
+const firstLoginPath = '/acesso/primeiro-acesso';
 const formPaths = new Set(['/login', '/acesso/definir-senha']);
 const safeMethods = new Set(['GET', 'HEAD', 'OPTIONS']);
 const idleMinutes = 30;
@@ -23,7 +24,8 @@ const hexToken = /^[0-9a-f]{64}$/;
 const hash = value => createHash('sha256').update(value).digest('hex');
 const randomToken = () => randomBytes(32).toString('hex');
 const sign = value => createHmac('sha256', secret).update(value).digest('hex');
-const isFormPath = req => formPaths.has(req.path.toLowerCase().replace(/\/$/, ''));
+const normalizedPath = req => req.path.toLowerCase().replace(/\/$/, '');
+const isFormPath = req => formPaths.has(normalizedPath(req));
 
 function parseOrigin(value, requireHttps = false) {
     const message = 'APP_URL deve conter a origem HTTP(S) do aplicativo, com HTTPS em produção.';
@@ -106,16 +108,16 @@ async function loadSession(req, res, next) {
         FROM users AS u
         WHERE s.token_hash = $1 AND s.user_id = u.id AND u.active
             AND s.expires_at > NOW() AND s.absolute_expires_at > NOW()
-        RETURNING u.id, u.name, u.email, u.role, s.id AS session_id, s.csrf_token, s.expires_at
+        RETURNING u.id, u.name, u.email, u.role, u.must_change_password, s.id AS session_id, s.csrf_token, s.expires_at
     `, [sessionHash, idleMinutes]);
     if (!session) {
         res.clearCookie(cookieName, cookieOptions);
         return;
     }
 
-    const { id, name, email, role } = session;
-    req.user = res.locals.user = { id, name, email, role };
-    req.session = { id: session.session_id, hash: sessionHash };
+    const { id, name, email, role, must_change_password: mustChangePassword } = session;
+    req.user = res.locals.user = { id, name, email, role, mustChangePassword };
+    req.session = { id: session.session_id, hash: sessionHash, expiresAt: session.expires_at };
     applyCsrf(req, res, session.csrf_token);
     setSessionCookie(res, token, session.expires_at);
 
@@ -158,8 +160,8 @@ async function create(req, res, user) {
     const tokenHash = hash(token);
     const session = await withTransaction(async client => {
         const { rows: current } = await client.query(
-            'SELECT id FROM users WHERE id = $1 AND active AND password_hash = $2 FOR UPDATE',
-            [user.id, user.password_hash]
+            'SELECT id FROM users WHERE id = $1 AND active AND password_hash = $2 AND name = $3 FOR UPDATE',
+            [user.id, user.password_hash, user.name]
         );
         if (!current.length) return null;
         const { rows } = await client.query(`
@@ -183,6 +185,15 @@ async function create(req, res, user) {
     if (!session) return false;
     setSessionCookie(res, token, session.expires_at);
     res.clearCookie(formCookieName, cookieOptions);
+    return true;
+}
+
+async function rotate(req, res, change) {
+    const token = randomToken();
+    const newHash = hash(token);
+    if (!await change(req.session.hash, newHash)) return false;
+    req.session.hash = newHash;
+    setSessionCookie(res, token, req.session.expiresAt);
     return true;
 }
 
@@ -227,6 +238,13 @@ function requireAuth(req, res, next) {
     next();
 }
 
+function requirePasswordChange(req, res, next) {
+    const path = normalizedPath(req);
+    if (req.user?.mustChangePassword && path !== firstLoginPath && path !== '/sair')
+        return res.redirect(303, firstLoginPath);
+    next();
+}
+
 function requireRole(role) {
     return (req, res, next) => requireAuth(req, res, () => {
         if (req.user.role !== role)
@@ -268,4 +286,7 @@ function csrf(req, res, next) {
     next();
 }
 
-module.exports = { load, create, destroy, destroyById, destroyAll, cleanupExpired, list, requireAuth, requireRole, csrf, linkOrigin };
+module.exports = {
+    load, create, rotate, destroy, destroyById, destroyAll, cleanupExpired, list, requireAuth,
+    requirePasswordChange, requireRole, csrf, linkOrigin, firstLoginPath
+};

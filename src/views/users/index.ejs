@@ -13,9 +13,18 @@
   <% if (link) { %>
   <section class="panel-form" aria-labelledby="password-link-heading">
     <h2 id="password-link-heading">Link para definir a senha</h2>
-    <p class="muted">Envie o link em particular para <%= link.email %>. Ele é válido por uma hora e pode ser usado uma vez.</p>
+    <p class="muted">Compartilhe o link em particular<%= link.name || link.email ? ' com ' + (link.name || link.email) : '' %>. Ele é válido por uma hora e pode ser usado uma vez.</p>
     <label>Link de acesso
       <input readonly type="text" value="<%= link.url %>">
+    </label>
+  </section>
+  <% } %>
+  <% if (userCreated) { %>
+  <section class="panel-form" aria-labelledby="temporary-password-heading">
+    <h2 id="temporary-password-heading">Senha temporária</h2>
+    <p class="muted">Copie a senha e compartilhe-a em particular com <%= userCreated.name %>. A troca de senha é obrigatória no primeiro acesso.</p>
+    <label>Senha temporária
+      <input readonly type="text" value="<%= userCreated.temporaryPassword %>" autocomplete="off" spellcheck="false">
     </label>
   </section>
   <% } %>
@@ -23,29 +32,21 @@
   <div class="split-layout">
     <form class="panel-form" method="post" action="/configuracoes/usuarios" aria-labelledby="new-user-heading">
       <%- include('../partials/csrf-field') %>
-      <h2 id="new-user-heading">Convidar usuário</h2>
+      <h2 id="new-user-heading">Criar usuário</h2>
       <div class="form-grid one-col">
-        <label>Nome
-          <input name="name" minlength="2" maxlength="120" required>
+        <label>Nome de usuário
+          <input name="name" value="<%= creationForm?.name || '' %>" minlength="2" maxlength="120" required>
         </label>
-        <label>E-mail
-          <input name="email" type="email" maxlength="254" required>
+        <label>E-mail (opcional)
+          <input name="email" type="email" value="<%= creationForm?.email || '' %>" maxlength="254">
         </label>
-        <label>Perfil
-          <select name="role">
-            <option value="analista">Analista</option>
-            <option value="admin">Administrador</option>
-          </select>
-        </label>
-        <label>Tarifa de reembolso (R$/km)
-          <input name="mileageRate" inputmode="decimal" maxlength="9" placeholder="Tarifa da empresa">
-        </label>
-        <label>Sua senha atual
-          <input name="currentPassword" type="password" autocomplete="current-password" maxlength="200" required>
+        <label class="checkbox-field">
+          <input type="checkbox" name="generate_link" value="1"<% if (creationForm?.generateLink) { %> checked<% } %>>
+          Gerar link de acesso (opcional)
         </label>
       </div>
       <div class="form-actions">
-        <button class="button" type="submit">Gerar convite</button>
+        <button class="button" type="submit">Criar usuário</button>
       </div>
     </form>
 
@@ -57,15 +58,28 @@
       <div class="stack">
         <% users.forEach((account) => { %>
         <% const isOwnAccount = typeof user !== 'undefined' && user?.id === account.id; %>
+        <% const active = account.active && !account.pending && !account.must_change_password; %>
         <details class="user-account">
           <summary>
             <span class="user-identity">
               <strong><%= account.name %></strong>
+              <% if (account.email) { %>
               <span class="muted"><%= account.email %></span>
+              <% } %>
             </span>
             <span class="user-account-status">
               <span><%= account.role === 'admin' ? 'Administrador' : 'Analista' %></span>
-              <span class="user-status<%= account.active && !account.pending ? ' user-status-active' : '' %>"><%= !account.active ? 'Inativa' : account.pending ? 'Convite pendente' : 'Ativa' %></span>
+              <span class="user-status<%= active ? ' user-status-active' : '' %>">
+                <% if (!account.active) { %>
+                  Inativa
+                <% } else if (account.pending) { %>
+                  Convite pendente
+                <% } else if (account.must_change_password) { %>
+                  Primeiro acesso pendente
+                <% } else { %>
+                  Ativa
+                <% } %>
+              </span>
             </span>
           </summary>
           <div class="user-account-body">

@@ -1,5 +1,6 @@
 <%
 const path = typeof currentPath === 'string' ? currentPath : '';
+const mustChangePassword = user?.mustChangePassword;
 const links = user
   ? [
       { href: '/dashboard', label: 'Dashboard' },
@@ -22,20 +23,24 @@ if (user?.role === 'admin') {
 %>
 <header class="site-header">
   <%- include('brand') %>
-  <button class="menu-toggle" type="button" aria-label="Abrir menu" aria-expanded="false" aria-controls="main-nav">
-    ☰
-  </button>
-  <nav class="main-nav" id="main-nav" aria-label="Navegação principal">
-    <% links.forEach(({ href, label }) => {
-      const aliases = href === '/configuracoes' && (path === '/usuarios' || path.startsWith('/usuarios/'));
-      const section = aliases || (href !== '/' && path.startsWith(href + '/'));
-    %>
-    <a href="<%= href %>"<% if (path === href || section) { %> aria-current="<%= path === href ? 'page' : 'location' %>"<% } %>><%= label %></a>
-    <% }) %>
-  </nav>
+  <% if (!mustChangePassword) { %>
+    <button class="menu-toggle" type="button" aria-label="Abrir menu" aria-expanded="false" aria-controls="main-nav">
+      ☰
+    </button>
+    <nav class="main-nav" id="main-nav" aria-label="Navegação principal">
+      <% links.forEach(({ href, label }) => {
+        const aliases = href === '/configuracoes' && (path === '/usuarios' || path.startsWith('/usuarios/'));
+        const section = aliases || (href !== '/' && path.startsWith(href + '/'));
+      %>
+      <a href="<%= href %>"<% if (path === href || section) { %> aria-current="<%= path === href ? 'page' : 'location' %>"<% } %>><%= label %></a>
+      <% }) %>
+    </nav>
+  <% } %>
   <div class="header-actions">
     <% if (user) { %>
-    <a class="muted header-account" href="/conta" title="<%= user.name %> (<%= user.role %>)"<% if (path === '/conta') { %> aria-current="page"<% } %>><%= user.name %> (<%= user.role %>)</a>
+      <% if (!mustChangePassword) { %>
+      <a class="muted header-account" href="/conta" title="<%= user.name %> (<%= user.role %>)"<% if (path === '/conta') { %> aria-current="page"<% } %>><%= user.name %> (<%= user.role %>)</a>
+      <% } %>
     <form method="post" action="/sair">
       <%- include('csrf-field') %>
       <button class="button button-small">

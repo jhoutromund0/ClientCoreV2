@@ -9,7 +9,7 @@ const pending = 'invite:pending';
 const dummySalt = 'e2bee928f4d4ab6acd9661ade99d54cbc';
 const hashToken = token => createHash('sha256').update(token).digest('hex');
 const randomToken = () => randomBytes(32).toString('hex');
-const columns = 'id, name, email, role, active, created_at, mileage_rate_cents_per_km';
+const columns = 'id, name, email, role, active, created_at, mileage_rate_cents_per_km, must_change_password';
 
 async function hashPassword(password) {
     const salt = randomBytes(16).toString('hex');
@@ -23,8 +23,8 @@ async function verifyPassword(password, stored) {
     return Boolean(parts && timingSafeEqual(actual, Buffer.from(parts[2], 'hex')));
 }
 
-async function byEmail(email) {
-    const { rows } = await query('SELECT * FROM users WHERE email = $1', [email.toLowerCase()]);
+async function byName(name) {
+    const { rows } = await query('SELECT * FROM users WHERE lower(btrim(name)) = lower(btrim($1))', [name]);
     return rows[0] || null;
 }
 
@@ -44,17 +44,16 @@ async function page(cursor) {
     return { ...pageFrom(rows, limit), after: sort === null ? null : cursor };
 }
 
-async function insert({ name, email, role, mileageRateCentsPerKm = null }, passwordHash, run = write) {
+async function insert({ name, email = null, role, mileageRateCentsPerKm = null, mustChangePassword = false }, passwordHash, run = write) {
     const { rows: [user] } = await run(`
-        INSERT INTO users(name, email, password_hash, role, mileage_rate_cents_per_km)
-        VALUES ($1, $2, $3, $4, $5) RETURNING ${columns}
-    `, [name, email, passwordHash, role, mileageRateCentsPerKm]);
+        INSERT INTO users(name, email, password_hash, role, mileage_rate_cents_per_km, must_change_password)
+        VALUES ($1, $2, $3, $4, $5, $6) RETURNING ${columns}
+    `, [name, email?.toLowerCase() || null, passwordHash, role, mileageRateCentsPerKm, mustChangePassword]);
     return user;
 }
 
 async function create(user) {
-    const email = user.email.toLowerCase();
-    return insert({ ...user, email }, await hashPassword(user.password));
+    return insert(user, await hashPassword(user.password));
 }
 
 async function savePasswordLink(client, userId) {
@@ -67,30 +66,45 @@ async function savePasswordLink(client, userId) {
     return token;
 }
 
+async function hasActiveSession(client, userId, sessionHash) {
+    const { rows } = await client.query(`
+        SELECT token_hash FROM sessions WHERE user_id = $1 AND token_hash = $2
+            AND expires_at > NOW() AND absolute_expires_at > NOW() FOR UPDATE
+    `, [userId, sessionHash]);
+    return rows.length > 0;
+}
+
 async function manage(actor, targetId, work) {
     return withTransaction(async client => {
         const { rows } = await client.query(`
-            SELECT id, name, email, role, active, password_hash, mileage_rate_cents_per_km
+            SELECT id, name, email, role, active, password_hash, mileage_rate_cents_per_km, must_change_password
             FROM users WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE
         `, [[actor.id, targetId || actor.id]]);
         const admin = rows.find(row => row.id === actor.id);
-        if (!admin?.active || admin.role !== 'admin' || admin.password_hash !== actor.password_hash) return null;
+        if (!admin?.active || admin.role !== 'admin' || admin.must_change_password) return null;
+        const authorized = actor.sessionHash
+            ? await hasActiveSession(client, admin.id, actor.sessionHash)
+            : admin.password_hash === actor.password_hash;
+        if (!authorized) return null;
         const target = rows.find(row => row.id === targetId?.toLowerCase());
         return work(client, target);
     });
 }
 
-async function createInvited(user, actor) {
+async function createManaged(user, actor, generateLink) {
+    const temporaryPassword = generateLink ? null : randomBytes(18).toString('base64url');
+    const passwordHash = generateLink ? pending : await hashPassword(temporaryPassword);
     return manage(actor, null, async client => {
-        const { id } = await insert(user, pending, client.query.bind(client));
-        return savePasswordLink(client, id);
+        const { id } = await insert({ ...user, mustChangePassword: true }, passwordHash, client.query.bind(client));
+        if (generateLink) return { token: await savePasswordLink(client, id) };
+        return { temporaryPassword };
     });
 }
 
 async function issuePasswordLink(id, actor) {
     return manage(actor, id, async (client, target) => {
         if (!target?.active || actor.id === target.id) return null;
-        return { email: target.email, token: await savePasswordLink(client, target.id) };
+        return { name: target.name, email: target.email, token: await savePasswordLink(client, target.id) };
     });
 }
 
@@ -118,17 +132,17 @@ async function consumePasswordLink(token, account, password) {
             DELETE FROM password_links WHERE token_hash = $1 AND user_id = $2 AND expires_at > NOW()
         `, [hashToken(token), account.id]);
         if (!result.rowCount) return false;
-        await client.query('UPDATE users SET password_hash = $2 WHERE id = $1', [account.id, passwordHash]);
+        await client.query('UPDATE users SET password_hash = $2, must_change_password = FALSE WHERE id = $1', [account.id, passwordHash]);
         await revokeSessions(client, account.id, null);
         return true;
     });
 }
 
-async function replacePassword(client, account, passwordHash, sessionHash) {
+async function replacePassword(client, account, passwordHash, sessionHash, mustChangePassword = false) {
     const result = await client.query(`
-        UPDATE users SET password_hash = $2
+        UPDATE users SET password_hash = $2, must_change_password = $4
         WHERE id = $1 AND password_hash = $3 AND active
-    `, [account.id, passwordHash, account.password_hash]);
+    `, [account.id, passwordHash, account.password_hash, mustChangePassword]);
     if (!result.rowCount) return false;
     await client.query('DELETE FROM password_links WHERE user_id = $1', [account.id]);
     await revokeSessions(client, account.id, sessionHash);
@@ -140,12 +154,26 @@ async function changePassword(account, password, sessionHash) {
     return withTransaction(client => replacePassword(client, account, passwordHash, sessionHash));
 }
 
+async function finishFirstLogin(account, password, sessionHash, newSessionHash) {
+    const passwordHash = await hashPassword(password);
+    return withTransaction(async client => {
+        const { rows } = await client.query(`
+            SELECT id FROM users WHERE id = $1 AND active AND must_change_password
+                AND password_hash = $2 AND name = $3 AND email IS NOT DISTINCT FROM $4 FOR UPDATE
+        `, [account.id, account.password_hash, account.name, account.email]);
+        if (!rows.length || !await hasActiveSession(client, account.id, sessionHash)) return false;
+        if (!await replacePassword(client, account, passwordHash, sessionHash)) return false;
+        await client.query('UPDATE sessions SET token_hash = $2 WHERE token_hash = $1', [sessionHash, newSessionHash]);
+        return true;
+    });
+}
+
 async function resetPassword(account, password, actor) {
     if (account.id === actor.id) return false;
     const passwordHash = await hashPassword(password);
     return manage(actor, account.id, (client, target) => {
         if (!target?.active || target.email !== account.email || target.name !== account.name) return false;
-        return replacePassword(client, account, passwordHash, null);
+        return replacePassword(client, account, passwordHash, null, target.must_change_password || target.password_hash === pending);
     });
 }
 
@@ -175,6 +203,6 @@ async function remove(id, actor) {
 }
 
 module.exports = {
-    verifyPassword, byEmail, activeById, page, create, createInvited, issuePasswordLink,
-    passwordLinkAccount, consumePasswordLink, changePassword, resetPassword, update, remove
+    verifyPassword, byName, activeById, page, create, createManaged, issuePasswordLink,
+    passwordLinkAccount, consumePasswordLink, changePassword, finishFirstLogin, resetPassword, update, remove
 };

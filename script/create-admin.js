@@ -32,7 +32,7 @@ async function main() {
 
         const account = await accountValidation.account({
             name: await rl.question('Nome: '),
-            email: await rl.question('E-mail: '),
+            email: await rl.question('E-mail (opcional): '),
             role: 'admin'
         });
         if (!account) throw new Error('Confira o nome e o e-mail.');
@@ -52,17 +52,18 @@ async function main() {
         const issue = await passwordPolicy.validate(password, account);
         if (issue) throw new Error(issue.message);
 
-        const existing = await User.byEmail(account.email);
-
-        if (existing) {
-            throw new Error('Já existe um usuário com esse e-mail.');
-        }
-
-        const admin = await User.create({ ...account, password });
+        const admin = await User.create({ ...account, password }).catch(error => {
+            if (error.code === '23505' && error.constraint === 'users_login_name_unique')
+                throw new Error('Já existe um usuário com esse nome.');
+            if (error.code === '23505' && error.constraint === 'users_email_key')
+                throw new Error('Já existe um usuário com esse e-mail.');
+            throw error;
+        });
 
         console.log('\nAdministrador criado com sucesso!');
         console.log('Nome:', admin.name);
-        console.log('E-mail:', admin.email);
+        if (admin.email)
+            console.log('E-mail:', admin.email);
         console.log('Perfil:', admin.role);
 
     } finally {

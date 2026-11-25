@@ -44,6 +44,7 @@ app.use(express.urlencoded({ extended: false, limit: '50kb' }));
 app.use(express.json({ limit: '50kb' }));
 app.use(auth.load);
 app.use(auth.csrf);
+app.use(auth.requirePasswordChange);
 app.use(auditContext.run);
 app.use(authRoutes);
 app.use('/', pageRoutes);

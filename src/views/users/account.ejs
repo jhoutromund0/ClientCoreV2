@@ -2,7 +2,7 @@
   <div class="page-title-row">
     <div>
       <h1>Minha conta</h1>
-      <p class="muted"><%= user.name %> · <%= user.email %></p>
+      <p class="muted"><%= user.name %><%= user.email ? ' · ' + user.email : '' %></p>
     </div>
   </div>
 

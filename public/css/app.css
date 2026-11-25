@@ -111,6 +111,9 @@ button,input,select,textarea {
   gap:20px;
   min-width:0
 }
+.brand + .header-actions {
+  margin-inline-start:auto
+}
 .header-account {
   max-width:155px;
   overflow:hidden;
@@ -1015,6 +1018,15 @@ td .travel-status {
 .panel-form input:focus,.panel-form select:focus,.panel-form textarea:focus,.filter-panel input:focus,.filter-panel select:focus,.search-field input:focus {
   border-color:var(--accent);
   box-shadow:0 0 0 3px #c5bdb11c
+}
+.panel-form .checkbox-field {
+  display:flex;
+  align-items:center
+}
+.panel-form .checkbox-field input {
+  width:auto;
+  margin:0;
+  accent-color:var(--green)
 }
 .form-grid.one-col {
   grid-template-columns:minmax(0,1fr)
