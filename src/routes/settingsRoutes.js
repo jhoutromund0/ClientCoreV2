@@ -8,6 +8,7 @@ router.post('/', wrap(settings.save));
 router.get('/usuarios', wrap(users.users));
 router.post('/usuarios', wrap(users.createUser));
 router.post('/usuarios/:id', wrap(users.updateUser));
+router.post('/usuarios/:id/senha', wrap(users.resetUserPassword));
 router.post('/usuarios/:id/excluir', wrap(users.removeUser));
 router.post('/usuarios/:id/recuperar', wrap(users.recoverUser));
 

@@ -69,56 +69,28 @@
             </span>
           </summary>
           <div class="user-account-body">
-            <form class="panel-form plain" method="post" action="/configuracoes/usuarios/<%= account.id %>">
+            <% if (isOwnAccount) { %>
+            <a class="button button-ghost" href="/conta#password-heading">Alterar minha senha</a>
+            <% } else { %>
+            <% const accountUrl = '/configuracoes/usuarios/' + account.id; %>
+            <form class="panel-form plain" method="post" action="<%= accountUrl %>/<%= account.active ? 'senha' : 'excluir' %>" data-user-actions>
               <%- include('../partials/csrf-field') %>
               <div class="form-grid">
-                <label>Nome
-                  <input name="name" value="<%= account.name %>" minlength="2" maxlength="120" required>
-                </label>
-                <label>E-mail
-                  <input name="email" type="email" value="<%= account.email %>" maxlength="254" required>
-                </label>
-                <label>Perfil
-                  <select name="role">
-                    <option value="analista"<%= account.role === 'analista' ? ' selected' : '' %>>Analista</option>
-                    <option value="admin"<%= account.role === 'admin' ? ' selected' : '' %>>Administrador</option>
-                  </select>
-                </label>
-                <label>Tarifa de reembolso (R$/km)
-                  <input name="mileageRate" inputmode="decimal" maxlength="9" placeholder="Tarifa da empresa"
-                         value="<%= account.mileage_rate_cents_per_km == null ? '' : (account.mileage_rate_cents_per_km / 100).toFixed(2).replace('.', ',') %>">
-                </label>
                 <label>Sua senha atual
                   <input name="currentPassword" type="password" autocomplete="current-password" maxlength="200" required>
                 </label>
-                <label class="user-active">
-                  <input name="active" type="checkbox" value="on"<%= account.active ? ' checked' : '' %>>
-                  Conta ativa
+                <% if (account.active) { %>
+                <label>Nova senha do usuário
+                  <input name="password" type="password" autocomplete="new-password" minlength="12" maxlength="200" required>
                 </label>
+                <% } %>
               </div>
               <div class="form-actions">
-                <button class="button" type="submit">Salvar alterações</button>
-              </div>
-            </form>
-              <% if (!isOwnAccount) { %>
-            <% if (account.active) { %>
-            <form class="panel-form plain" method="post" action="/configuracoes/usuarios/<%= account.id %>/recuperar">
-              <%- include('../partials/csrf-field') %>
-              <label>Sua senha atual
-                <input name="currentPassword" type="password" autocomplete="current-password" maxlength="200" required>
-              </label>
-              <div class="form-actions">
-                <button class="button button-ghost" type="submit">Gerar novo link de acesso</button>
-              </div>
-            </form>
-            <% } %>
-            <form class="panel-form plain" method="post" action="/configuracoes/usuarios/<%= account.id %>/excluir" data-confirm="Excluir esta conta?">
-              <%- include('../partials/csrf-field') %>
-              <label>Sua senha atual
-                <input name="currentPassword" type="password" autocomplete="current-password" maxlength="200" required>
-              </label>
-              <div class="form-actions">
-                <button class="button button-ghost danger" type="submit">Excluir usuário</button>
+                <% if (account.active) { %>
+                <button class="button" type="submit">Alterar senha</button>
+                <button class="button button-ghost" type="submit" formaction="<%= accountUrl %>/recuperar" formnovalidate>Gerar novo link de acesso</button>
+                <% } %>
+                <button class="button button-ghost danger" type="submit" formaction="<%= accountUrl %>/excluir"<%= account.active ? ' formnovalidate' : '' %> data-confirm="Excluir esta conta?">Excluir usuário</button>
               </div>
             </form>
             <% } %>

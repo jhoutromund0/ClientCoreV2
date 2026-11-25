@@ -14,11 +14,23 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
-// Confirmação de ações destrutivas (substitui onsubmit inline, bloqueado pelo CSP do helmet).
 document.addEventListener('submit', (event) => {
-    const message = event.target.dataset && event.target.dataset.confirm;
-    if (message && !window.confirm(message))
+    const form = event.target;
+    const button = event.submitter;
+    const ignoresNewPassword = button?.formNoValidate && form.hasAttribute('data-user-actions');
+    if (ignoresNewPassword && !form.elements.currentPassword.reportValidity()) {
         event.preventDefault();
+        return;
+    }
+
+    const message = button?.dataset.confirm || form.dataset.confirm;
+    if (message && !window.confirm(message)) {
+        event.preventDefault();
+        return;
+    }
+
+    if (ignoresNewPassword)
+        form.addEventListener('formdata', event => event.formData.delete('password'), { once: true });
 });
 
 const optionSearch = (() => {

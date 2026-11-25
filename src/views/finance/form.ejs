@@ -69,7 +69,7 @@
     <% const linked = state.finalized ? state.inventory : state.planned; %>
     <% if (linked.length) { %>
     <section class="finance-section" aria-labelledby="finance-linked-title">
-      <h2 id="finance-linked-title"><%= state.finalized ? 'Materiais confirmados na visita' : 'Materiais previstos na visita' %></h2>
+      <h2 id="finance-linked-title"><%= state.finalized ? 'Materiais utilizados na visita' : 'Materiais previstos na visita' %></h2>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Material</th><th>Quantidade</th><th>Custo unitário</th><th>Preço unitário</th></tr></thead>
@@ -80,7 +80,7 @@
           </tbody>
         </table>
       </div>
-      <% if (!state.finalized) { %><p class="muted">Os materiais entram no total após a confirmação de consumo.</p><% } %>
+      <% if (!state.finalized) { %><p class="muted">Os materiais utilizados entram no total após a conclusão da visita.</p><% } %>
     </section>
     <% } %>
     <h2 class="finance-section">Materiais avulsos</h2>

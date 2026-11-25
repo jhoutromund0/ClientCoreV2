@@ -144,9 +144,30 @@ exports.removeUser = withPasswordConfirmation(renderUsers, async (req, res, acco
     } catch (error) {
         if (!['23503', '23001'].includes(error.code))
             throw error;
-        return renderUsers(req, res, { error: 'Esta conta está vinculada a visitas. Desative-a para preservar o histórico.', status: 409 });
+        return renderUsers(req, res, { error: 'Esta conta está vinculada a visitas e precisa ser mantida para preservar o histórico.', status: 409 });
     }
     await req.setFlash({ type: 'success', message: 'Conta excluída.' });
+    return res.redirect(303, usersPath);
+});
+
+exports.resetUserPassword = withPasswordConfirmation(renderUsers, async (req, res, actor) => {
+    const id = req.params.id;
+    if (!isUuid(id) || id.toLowerCase() === actor.id)
+        return renderUsers(req, res, { error: 'Selecione outra conta para alterar a senha.', status: 422 });
+    const account = await User.activeById(id);
+    if (!account)
+        return renderUsers(req, res, unavailableAccount);
+    const password = req.body?.password;
+    if (password === req.body.currentPassword)
+        return renderUsers(req, res, { error: 'Escolha uma senha diferente da sua senha de administrador.', status: 422 });
+    const issue = await passwordPolicy.validate(password, account);
+    if (issue)
+        return renderUsers(req, res, { error: issue.message, status: issue.status || 422 });
+    if (await User.verifyPassword(password, account.password_hash))
+        return renderUsers(req, res, { error: 'Escolha uma senha diferente da atual.', status: 422 });
+    if (!await User.resetPassword(account, password, actor))
+        return renderUsers(req, res, { error: 'A conta foi alterada. Abra a página atualizada e tente novamente.', status: 409 });
+    await req.setFlash({ type: 'success', message: 'Senha alterada e sessões do usuário encerradas.' });
     return res.redirect(303, usersPath);
 });
 

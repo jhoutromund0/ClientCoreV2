@@ -531,29 +531,22 @@ td .travel-status {
 .travel-attribution a {
   text-decoration:underline
 }
-.travel-addresses {
-  margin-top:16px
-}
-.travel-calculate-link {
-  display:inline-block;
-  margin-top:6px;
-  text-decoration:underline
-}
 .travel-lookup {
   margin-top:16px
 }
-.travel-lookup-confirmation {
+.client-form .travel-lookup-confirmation {
   display:flex;
   align-items:flex-start;
   gap:8px;
   font-size:13px
 }
-.travel-lookup-confirmation input {
+.client-form .travel-lookup-confirmation input {
+  width:auto;
   margin:2px 0 0;
   accent-color:var(--green)
 }
-.lookup-terms {
-  margin:6px 0 12px
+.travel-lookup .form-hint,.travel-lookup .travel-attribution {
+  margin:6px 0 0
 }
 .back-link {
   display:block;
@@ -1075,19 +1068,6 @@ td .travel-status {
 .user-account-body {
   padding:16px;
   border-top:1px solid #ffffff13
-}
-.panel-form .user-active {
-  display:flex;
-  align-items:center
-}
-.user-active input[type=checkbox] {
-  width:auto;
-  margin:0;
-  accent-color:var(--green)
-}
-.user-active input[type=checkbox]:focus-visible {
-  outline:2px solid var(--accent);
-  outline-offset:2px
 }
 .search-field {
   min-width:min(220px,100%)

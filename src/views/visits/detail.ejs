@@ -52,7 +52,7 @@
     <% if (visit.materialsUsed.length) { %>
     <div class="table-wrap" tabindex="0" role="region" aria-label="Materiais da visita">
       <table>
-        <thead><tr><th scope="col">Material</th><th scope="col">Planejado</th><th scope="col">Utilizado</th><th scope="col">Baixa confirmada</th></tr></thead>
+        <thead><tr><th scope="col">Material</th><th scope="col">Planejado</th><th scope="col">Utilizado</th><th scope="col">Baixa no estoque</th></tr></thead>
         <tbody>
         <% const quantity = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 }); %>
         <% visit.materialsUsed.forEach(line => { %>

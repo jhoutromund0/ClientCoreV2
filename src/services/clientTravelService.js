@@ -13,7 +13,6 @@ const statuses = {
     route_not_found: 'Rota de carro indisponível para este endereço.',
     temporarily_unavailable: 'Serviço de rotas indisponível. Tente novamente mais tarde.'
 };
-const pending = { statusMessage: 'Quilometragem a calcular.', canCalculate: true };
 
 const validMeters = meters => Number.isFinite(meters) && meters >= 0 && Number.isSafeInteger(Math.round(meters * 1000));
 const kilometersToMeters = km => Math.round(km * 1000000) / 1000;
@@ -23,14 +22,12 @@ function describe(client, settings, addressError = statuses.address_not_found) {
     if (typeof address !== 'string' || !address.trim())
         return { statusMessage: 'Informe o endereço para calcular o deslocamento.' };
 
+    const pending = { statusMessage: location.isConfigured() ? 'Calculando quilometragem…' : 'Quilometragem pendente.' };
     const travel = client.travel;
     if (travel?.revision !== settings.revision || travel.address !== address)
         return pending;
     if (travel.status !== 'ready')
-        return {
-            statusMessage: travel.status === 'address_not_found' ? addressError : (statuses[travel.status] || pending.statusMessage),
-            canCalculate: true
-        };
+        return { statusMessage: travel.status === 'address_not_found' ? addressError : statuses[travel.status] || pending.statusMessage };
     if (!validMeters(travel.outboundMeters) || !validMeters(travel.roundTripMeters)
         || travel.roundTripMeters < travel.outboundMeters)
         return pending;
@@ -155,30 +152,25 @@ async function withTravelLock(work, busy) {
     }
 }
 
-async function calculateClientTravel(id, { publicUse, expectedAddress, expectedRevision }) {
-    const changed = { type: 'error', message: 'Os dados do deslocamento mudaram. Confira os endereços e tente novamente.' };
-    const busy = { type: 'info', message: 'Há outro deslocamento em cálculo. Tente novamente em instantes.' };
+async function calculateOnSave({ id, address: expectedAddress }, expectedRevision) {
+    const changed = { type: 'info', message: 'Os dados do deslocamento mudaram. Revise os endereços antes de consultar novamente.' };
+    const busy = { type: 'info', message: 'Há outro deslocamento em cálculo. A quilometragem ficou pendente.' };
     return withTravelLock(async run => {
         const client = await Client.find(id, run);
-        if (!client)
-            return null;
+        if (!client || client.address !== expectedAddress)
+            return changed;
         const { address, travel: previous } = client;
-        if (!address)
-            return { type: 'error', message: 'Cadastre o endereço do cliente antes de calcular a quilometragem.' };
         const settings = await TransportSettings.get(run);
         const { originAddress, revision } = settings;
-        if (expectedAddress !== address || expectedRevision !== revision)
+        if (expectedRevision !== revision)
             return changed;
 
         const reusable = reusableRoute(previous, address, originAddress);
-        const publicLookup = !location.isConfigured();
         const sameRoute = previous?.address === address && previous.originAddress === originAddress;
-        if (!reusable && publicLookup && !publicUse)
-            return { type: 'error', message: 'Confirme que os endereços são públicos e a consulta é para uso não comercial.' };
         if (sameRoute && previous.status === 'temporarily_unavailable' && previous.retryAfter > Date.now())
             return { type: 'error', message: statuses.temporarily_unavailable };
 
-        const distanceKm = location.createDistanceLookup({ publicLookup });
+        const distanceKm = location.createDistanceLookup({ publicLookup: true });
         const result = await resolveTravel(address, settings, reusable ? previous : null, distanceKm);
         if (!await Client.saveTravel(id, address, result, run))
             return changed;
@@ -212,4 +204,4 @@ function start() {
     };
 }
 
-module.exports = { describe, calculateClientTravel, start, travelCostCents };
+module.exports = { describe, calculateOnSave, start, travelCostCents };

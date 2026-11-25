@@ -59,6 +59,21 @@
       </label>
     </div>
     <p class="lookup-status" id="cnpj-status" role="status"></p>
+    <% if (publicLookup) { %>
+    <div class="travel-lookup">
+      <input type="hidden" name="expectedRevision" value="<%= transportSettings.revision %>">
+      <label class="travel-lookup-confirmation">
+        <input type="checkbox" name="publicUse" value="yes" aria-describedby="public-travel-terms">
+        <span>Calcular quilometragem ao salvar</span>
+      </label>
+      <p class="form-hint muted" id="public-travel-terms">Marque apenas para endereços públicos, sem dados pessoais ou confidenciais, e uso não comercial. A partida será de <%= transportSettings.originAddress %>.</p>
+      <p class="travel-attribution">
+        <a href="https://operations.osmfoundation.org/policies/nominatim/">Política de geocodificação</a> ·
+        <a href="https://routing.openstreetmap.de/about.html#usage-policy">Política de roteamento</a>
+      </p>
+      <%- include('../partials/travel-attribution', { showMapCorrection: true }) %>
+    </div>
+    <% } %>
     <div class="form-actions">
       <a class="button button-ghost" href="/clientes">
         Cancelar
@@ -71,33 +86,9 @@
   </form>
   <% if (clientData.id && travel && !errors.length) { %>
   <section class="panel travel-summary" aria-labelledby="travel-heading">
-    <h2 id="travel-heading" tabindex="-1">Deslocamento</h2>
+    <h2 id="travel-heading">Deslocamento</h2>
     <%- include('travel', { trip: travel }) %>
-    <% if (travel.canCalculate) { %>
-    <% if (publicLookup) { %>
-    <dl class="travel-distances travel-addresses">
-      <dt>Endereço base</dt><dd><%= transportSettings.originAddress %></dd>
-      <dt>Endereço do cliente</dt><dd><%= clientData.address %></dd>
-    </dl>
-    <% } %>
-    <form class="travel-lookup" action="/clientes/<%= clientData.id %>/deslocamento" method="post">
-      <%- include('../partials/csrf-field') %>
-      <input type="hidden" name="expectedAddress" value="<%= clientData.address %>">
-      <input type="hidden" name="expectedRevision" value="<%= transportSettings.revision %>">
-      <% if (publicLookup) { %>
-      <label class="travel-lookup-confirmation">
-        <input type="checkbox" name="publicUse" value="yes" required>
-        <span>Confirmo que os dois endereços são públicos, sem dados pessoais ou confidenciais, e que a consulta é para uso não comercial.</span>
-      </label>
-      <p class="travel-attribution lookup-terms">
-        <a href="https://operations.osmfoundation.org/policies/nominatim/">Política de geocodificação</a> ·
-        <a href="https://routing.openstreetmap.de/about.html#usage-policy">Política de roteamento</a>
-      </p>
-      <% } %>
-      <button class="button button-ghost" type="submit">Calcular quilometragem</button>
-    </form>
-    <% } %>
-    <% if (travel.outboundKm || (publicLookup && travel.canCalculate)) { %>
+    <% if (travel.outboundKm && !publicLookup) { %>
     <%- include('../partials/travel-attribution', { showMapCorrection: true }) %>
     <% } %>
   </section>

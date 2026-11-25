@@ -109,9 +109,7 @@ async function prepare(runner, input, previous) {
     const servicePriceCents = input.servicePriceCents ?? service?.priceCents ?? previous?.servicePriceCents ?? null;
     const status = input.status || previous?.status || 'agendada';
     if (previous?.status === 'concluida' && status !== 'concluida')
-        throw new ConflictError('Uma visita concluída mantém o consumo confirmado. Corrija as quantidades na edição, se necessário.');
-    if (status === 'concluida' && (!previous || previous.status !== status || input.resources) && !input.confirmed)
-        throw new ValidationError('Confirme o consumo informado para concluir a visita.');
+        throw new ConflictError('Uma visita concluída mantém o consumo registrado. Corrija as quantidades na edição, se necessário.');
     const manualTravel = input.manualTravel === undefined ? previous?.manualTravel ?? null : normalizeManualTravel(input.manualTravel);
     if (input.manualTravel != null && !manualTravel)
         throw new ValidationError('Informe uma quilometragem total igual ou superior à distância de ida.');
@@ -192,7 +190,7 @@ function cancel(id, revision) {
     return change(id, async (runner, visit) => {
         checkRevision(visit, revision);
         if (visit.status === 'concluida')
-            throw new ConflictError('Uma visita concluída mantém o consumo confirmado e não pode ser cancelada.');
+            throw new ConflictError('Uma visita concluída mantém o consumo registrado e não pode ser cancelada.');
         if (visit.status === 'cancelada')
             return visit;
         const { rows: [valid] } = await runner.query(

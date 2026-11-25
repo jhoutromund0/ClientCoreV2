@@ -197,7 +197,6 @@ function draftFromBody(body, visit) {
         servicePrice: text(body.servicePrice),
         address: Object.hasOwn(body, 'address') ? text(body.address) : undefined,
         status: text(body.status) || visit?.status || 'agendada',
-        confirmed: body.confirmConsumption === 'on',
         assigneeIds: list(body.assigneeId).slice(0, 21).map(id => text(id).toLowerCase()),
         travelPayeeId: body.travelPayeeId === undefined ? visit?.travelPayeeId || '' : text(body.travelPayeeId).toLowerCase(),
         outboundKm: body.outboundKm === undefined ? kilometersField(visit?.manualTravel?.outboundMeters) : text(body.outboundKm),
@@ -285,9 +284,9 @@ async function save(req, res, visit) {
         return renderForm(req, res, draft, visit, errors, 422);
 
     try {
-        const { clientId, serviceId, status, address, revision, confirmed, description } = draft;
+        const { clientId, serviceId, status, address, revision, description } = draft;
         const data = {
-            clientId, serviceId, status, address, revision, confirmed, description,
+            clientId, serviceId, status, address, revision, description,
             requireAddress: draft.official && !visit,
             scheduledAt: draft.scheduledTime ? `${draft.scheduledDate}T${draft.scheduledTime}` : draft.scheduledDate,
             servicePriceCents: priceCents(draft.servicePrice),

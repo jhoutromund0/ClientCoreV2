@@ -70,7 +70,7 @@ async function savePasswordLink(client, userId) {
 async function manage(actor, targetId, work) {
     return withTransaction(async client => {
         const { rows } = await client.query(`
-            SELECT id, email, role, active, password_hash, mileage_rate_cents_per_km
+            SELECT id, name, email, role, active, password_hash, mileage_rate_cents_per_km
             FROM users WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE
         `, [[actor.id, targetId || actor.id]]);
         const admin = rows.find(row => row.id === actor.id);
@@ -124,17 +124,28 @@ async function consumePasswordLink(token, account, password) {
     });
 }
 
+async function replacePassword(client, account, passwordHash, sessionHash) {
+    const result = await client.query(`
+        UPDATE users SET password_hash = $2
+        WHERE id = $1 AND password_hash = $3 AND active
+    `, [account.id, passwordHash, account.password_hash]);
+    if (!result.rowCount) return false;
+    await client.query('DELETE FROM password_links WHERE user_id = $1', [account.id]);
+    await revokeSessions(client, account.id, sessionHash);
+    return true;
+}
+
 async function changePassword(account, password, sessionHash) {
     const passwordHash = await hashPassword(password);
-    return withTransaction(async client => {
-        const result = await client.query(`
-            UPDATE users SET password_hash = $2
-            WHERE id = $1 AND password_hash = $3 AND active
-        `, [account.id, passwordHash, account.password_hash]);
-        if (!result.rowCount) return false;
-        await client.query('DELETE FROM password_links WHERE user_id = $1', [account.id]);
-        await revokeSessions(client, account.id, sessionHash);
-        return true;
+    return withTransaction(client => replacePassword(client, account, passwordHash, sessionHash));
+}
+
+async function resetPassword(account, password, actor) {
+    if (account.id === actor.id) return false;
+    const passwordHash = await hashPassword(password);
+    return manage(actor, account.id, (client, target) => {
+        if (!target?.active || target.email !== account.email || target.name !== account.name) return false;
+        return replacePassword(client, account, passwordHash, null);
     });
 }
 
@@ -165,5 +176,5 @@ async function remove(id, actor) {
 
 module.exports = {
     verifyPassword, byEmail, activeById, page, create, createInvited, issuePasswordLink,
-    passwordLinkAccount, consumePasswordLink, changePassword, update, remove
+    passwordLinkAccount, consumePasswordLink, changePassword, resetPassword, update, remove
 };

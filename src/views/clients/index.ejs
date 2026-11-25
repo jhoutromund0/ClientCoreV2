@@ -76,14 +76,7 @@
             <%= client.establishmentType === 'matriz' ? 'Matriz' : client.establishmentType === 'filial' ? 'Filial' : '—' %>
           </td>
           <td>
-            <% if (client.tripDisplay) { %>
             <%- include('travel', { trip: client.tripDisplay }) %>
-            <% if (client.tripDisplay.canCalculate) { %>
-            <a class="travel-calculate-link" href="/clientes/<%= client.id %>/editar#travel-heading">Calcular quilometragem</a>
-            <% } %>
-            <% } else { %>
-            —
-            <% } %>
           </td>
           <td class="client-actions-column">
             <div class="actions">

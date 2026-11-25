@@ -13,13 +13,16 @@ const PUBLIC_ENDPOINTS = {
 };
 const PUBLIC_INTERVAL_MS = 1050;
 const PUBLIC_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const PUBLIC_MISS_TTL_MS = 60 * 1000;
 const PUBLIC_CACHE_LIMIT = 500;
 const publicCache = new Map();
 const publicCooldown = new Map();
 const TIMEOUT_MS = 8000;
 const USER_AGENT = 'ClientCoreV2/1.0 (+https://github.com/jhoutromund0/ClientCoreV2)';
 const postalCodePattern = /^\d{5}-\d{3}$/;
-const houseNumberPattern = /^\d+[a-z]?$/i;
+const houseNumberPrefix = /^n(?:[.º°]+|o\b|umero\b|\s+)\s*/;
+const houseNumberPattern = /^(\d{1,3}(?:\.\d{3})+|\d+)([a-z]?)$/;
+const addressSeparator = /\s+[-–—]\s+/;
 const STATES = {
     AC: 'Acre', AL: 'Alagoas', AP: 'Amapá', AM: 'Amazonas', BA: 'Bahia', CE: 'Ceará',
     DF: 'Distrito Federal', ES: 'Espírito Santo', GO: 'Goiás', MA: 'Maranhão', MT: 'Mato Grosso',
@@ -143,7 +146,8 @@ async function cachePublic(key, lookup) {
     publicCache.delete(key);
     if (publicCache.size >= PUBLIC_CACHE_LIMIT)
         publicCache.delete(publicCache.keys().next().value);
-    publicCache.set(key, { value, expires: Date.now() + PUBLIC_CACHE_TTL_MS });
+    const ttl = value === null ? PUBLIC_MISS_TTL_MS : PUBLIC_CACHE_TTL_MS;
+    publicCache.set(key, { value, expires: Date.now() + ttl });
     return value;
 }
 
@@ -154,13 +158,18 @@ const expandStreet = (value) => value.replace(/^([a-zç]{1,4})\.?\s+/i, (prefix,
 });
 const streetKey = (value) => normalize(expandStreet(value)).replace(/[^a-z0-9]+/g, ' ').trim();
 
+function houseNumber(value) {
+    const number = normalize(String(value ?? '')).trim().replace(houseNumberPrefix, '');
+    const match = houseNumberPattern.exec(number);
+    return match ? match[1].replaceAll('.', '') + match[2] : '';
+}
+
 function addressQueries(address, publicLookup) {
-    const segments = address.trim().split(/\s+-\s+/);
+    const segments = address.trim().split(addressSeparator);
     const municipality = segments.findIndex((segment) => /\/[a-z]{2}$/i.test(segment));
     // A resposta do CNPJá põe complemento e bairro entre o número e o município/UF.
     const text = municipality > 0 ? [segments[0], ...segments.slice(municipality)].join(', ') : address;
-    const parts = text
-        .replace(/\s+-\s+/g, ', ')
+    const parts = text.split(addressSeparator).join(', ')
         .replace(/\/([a-z]{2})(?=\s*(?:,|$))/gi, ', $1')
         .replace(/\b(?:CEP\s*)?(\d{5})-?(\d{3})\b/gi, '$1-$2')
         .split(',').map((part) => part.trim()).filter(Boolean);
@@ -169,9 +178,11 @@ function addressQueries(address, publicLookup) {
 
     parts[0] = expandStreet(parts[0]);
     const street = streetKey(parts[0]);
-    const number = houseNumberPattern.test(parts[1]) ? parts[1] : '';
+    const number = houseNumber(parts[1]);
     if (number)
         parts.splice(0, 2, `${parts[0]} ${number}`);
+    else if (houseNumberPrefix.test(normalize(parts[1])))
+        return null;
     else if (/^S\s*\/?\s*N\.?$/i.test(parts[1]))
         parts.splice(1, 1);
 
@@ -218,12 +229,13 @@ function matchAddress(place, requested) {
         return null;
     const name = streetKey(street);
     const suffix = requested.street.slice(name.length).trim();
-    if (requested.street !== name && !(requested.street.startsWith(`${name} `) && houseNumberPattern.test(suffix)))
+    const inlineNumber = houseNumber(suffix);
+    if (requested.street !== name && !(requested.street.startsWith(`${name} `) && inlineNumber))
         return null;
 
-    const expectedNumber = requested.number || suffix;
-    const matchedNumber = String(address.house_number ?? '').trim().toLowerCase();
-    const matchesNumber = expectedNumber ? expectedNumber.toLowerCase() === matchedNumber
+    const expectedNumber = requested.number || inlineNumber;
+    const matchedNumber = String(address.house_number ?? '').trim();
+    const matchesNumber = expectedNumber ? expectedNumber === houseNumber(matchedNumber)
         : !matchedNumber && (place.category === 'highway' || place.addresstype === 'road');
     if (!matchesNumber)
         return null;

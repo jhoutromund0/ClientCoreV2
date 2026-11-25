@@ -103,7 +103,7 @@
 
     <section class="stack" aria-labelledby="visit-materials">
       <h2 id="visit-materials">Materiais</h2>
-      <p class="muted form-hint">A quantidade utilizada será baixada do estoque quando o consumo for confirmado na conclusão da visita.</p>
+      <p class="muted form-hint">Ao salvar a visita como concluída, as quantidades utilizadas são baixadas do estoque.</p>
       <% if (visit?.materials && !visit.materialsUsed.length) { %><p class="muted">Materiais informados no registro anterior: <%= visit.materials %></p><% } %>
       <div class="stack" data-visit-materials>
         <% draft.materials.forEach(line => { %><%- include('material-line', { line, materials }) %><% }) %>
@@ -112,10 +112,6 @@
           line: { materialId: '', plannedQuantity: '', usedQuantity: '' }, materials
       }) %></template>
       <div class="action-group"><button class="button button-ghost" type="button" data-visit-material-add>Adicionar material</button></div>
-      <label class="user-active">
-        <input type="checkbox" name="confirmConsumption" <%= draft.confirmed ? 'checked' : '' %>>
-        Confirmo as quantidades utilizadas para a conclusão ou correção do consumo.
-      </label>
     </section>
 
     <div class="form-actions">
