@@ -40,8 +40,5 @@
     <%- include('../partials/pagination', {
         page, path: '/visitas', params: { ...(search ? { cliente: search } : {}), ...(status ? { situacao: status } : {}) }
     }) %>
-    <% if (visits.some(visit => visit.tripDisplay.roundTripKm && !visit.tripDisplay.manual)) { %>
-    <%- include('../partials/travel-attribution', { showMapCorrection: false }) %>
-    <% } %>
   </section>
 </main>

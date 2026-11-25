@@ -494,11 +494,6 @@ tbody tr:last-child td {
   color:var(--muted);
   margin:0 auto 20px
 }
-.travel-attribution {
-  font-size:11px;
-  color:#b5aa98;
-  margin-top:18px
-}
 .travel-summary {
   margin-top:20px
 }
@@ -528,7 +523,7 @@ td .travel-status {
   max-width:16rem;
   white-space:normal
 }
-.travel-attribution a {
+.travel-credits a,.travel-policy a {
   text-decoration:underline
 }
 .travel-lookup {
@@ -545,8 +540,19 @@ td .travel-status {
   margin:2px 0 0;
   accent-color:var(--green)
 }
-.travel-lookup .form-hint,.travel-lookup .travel-attribution {
+.travel-lookup .form-hint,.travel-policy {
   margin:6px 0 0
+}
+.travel-policy {
+  font-size:12px;
+  color:var(--muted)
+}
+.travel-policy summary {
+  cursor:pointer;
+  width:fit-content
+}
+.travel-policy p {
+  margin:4px 0 0
 }
 .back-link {
   display:block;

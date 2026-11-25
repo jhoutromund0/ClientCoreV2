@@ -59,9 +59,6 @@
         <div><dt>Valor a pagar pelo deslocamento</dt><dd><%= state.travel.costCents == null ? 'A calcular' : formatMoney(state.travel.costCents) %></dd></div>
         <% if (state.travel.payeeName) { %><div><dt>Quem recebe</dt><dd><%= state.travel.payeeName %></dd></div><% } %>
       </dl>
-      <% if (state.travel.source !== 'manual') { %>
-      <%- include('../partials/travel-attribution', { showMapCorrection: false }) %>
-      <% } %>
       <% } else { %>
       <p class="muted"><%= state.travelDescription.statusMessage %></p>
       <% } %>

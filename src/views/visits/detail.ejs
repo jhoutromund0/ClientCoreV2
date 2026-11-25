@@ -39,8 +39,6 @@
       <% } %>
       <% if (tripDisplay.roundTripKm && tripDisplay.manual) { %>
       <p class="muted form-hint">Quilometragem informada na visita.</p>
-      <% } else if (tripDisplay.roundTripKm) { %>
-      <%- include('../partials/travel-attribution', { showMapCorrection: false }) %>
       <% } %>
       <% if (tripDisplay.statusMessage) { %><p class="muted"><%= tripDisplay.statusMessage %></p><% } %>
       <% if (tripDisplay.needsPayee) { %><p class="muted">Selecione quem recebe o deslocamento ao editar a visita.</p><% } %>

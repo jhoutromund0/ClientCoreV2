@@ -1,4 +1,10 @@
 <footer class="site-footer">
   <%- include('brand') %>
+  <% if (user && /^\/(?:dashboard|clientes|visitas|financeiro)(?:\/|$)/i.test(currentPath)) { %>
+  <span class="travel-credits">
+    <a href="https://www.openstreetmap.org/copyright">© OpenStreetMap</a> ·
+    <a href="https://www.openstreetmap.org/fixthemap">Corrigir o mapa</a>
+  </span>
+  <% } %>
   <span>© <%= new Date().getFullYear() %> Client Core</span>
 </footer>

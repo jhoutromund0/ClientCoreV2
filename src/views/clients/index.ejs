@@ -109,7 +109,4 @@
   </section>
   <% } %>
   <%- include('../partials/pagination', { page, path: '/clientes' }) %>
-  <% if (clients.some(client => client.tripDisplay?.outboundKm)) { %>
-  <%- include('../partials/travel-attribution', { showMapCorrection: true }) %>
-  <% } %>
 </main>
