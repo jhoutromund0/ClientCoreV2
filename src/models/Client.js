@@ -58,7 +58,7 @@ module.exports = class Client {
                 AND (cnpj_key IS NULL OR cnpj_key ~ '^[A-Z0-9]{12}[0-9]{2}$')
                 AND (data#>>'{travel,revision}' IS DISTINCT FROM $1
                     OR data#>>'{travel,address}' IS DISTINCT FROM btrim(data->>'address')
-                    OR (data#>>'{travel,status}' = 'temporarily_unavailable'
+                    OR (data#>>'{travel,status}' IN ('temporarily_unavailable', 'address_not_found')
                         AND CASE WHEN data#>>'{travel,retryAfter}' ~ '^[0-9]{1,18}$'
                             THEN (data#>>'{travel,retryAfter}')::bigint ELSE 0 END <= $3))
                 AND ($4::text IS NULL OR (data#>>'{travel,status}' = 'ready'

@@ -7,6 +7,7 @@ const location = require('./locationService');
 
 const kilometers = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 });
 const reais = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+const addressNotFoundRetryMs = 24 * 60 * 60 * 1000;
 const statuses = {
     address_not_found: 'Endereço do cliente não localizado. Confira o cadastro.',
     origin_not_found: 'Endereço da empresa não localizado. Confira as configurações.',
@@ -89,6 +90,8 @@ async function resolveTravel(address, settings, reusable, distanceKm) {
     } catch (error) {
         if (!(error instanceof location.LocationError))
             throw error;
+        if (error.reason === 'address_not_found')
+            return { ...travel, status: error.reason, retryAfter: Date.now() + addressNotFoundRetryMs };
         if (error.reason)
             return { ...travel, status: error.reason };
         const delay = Math.min(2147483647, Math.max(60, error.retryAfter || 0) * 1000);
@@ -167,8 +170,9 @@ async function calculateOnSave({ id, address: expectedAddress }, expectedRevisio
 
         const reusable = reusableRoute(previous, address, originAddress);
         const sameRoute = previous?.address === address && previous.originAddress === originAddress;
-        if (sameRoute && previous.status === 'temporarily_unavailable' && previous.retryAfter > Date.now())
-            return { type: 'error', message: statuses.temporarily_unavailable };
+        if (sameRoute && previous.retryAfter > Date.now() &&
+            ['temporarily_unavailable', 'address_not_found'].includes(previous.status))
+            return { type: 'error', message: statuses[previous.status] };
 
         const distanceKm = location.createDistanceLookup({ publicLookup: true });
         const result = await resolveTravel(address, settings, reusable ? previous : null, distanceKm);

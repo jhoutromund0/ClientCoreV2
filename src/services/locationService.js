@@ -13,7 +13,6 @@ const PUBLIC_ENDPOINTS = {
 };
 const PUBLIC_INTERVAL_MS = 1050;
 const PUBLIC_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-const PUBLIC_MISS_TTL_MS = 60 * 1000;
 const PUBLIC_CACHE_LIMIT = 500;
 const publicCache = new Map();
 const publicCooldown = new Map();
@@ -143,11 +142,12 @@ async function cachePublic(key, lookup) {
     if (cached && cached.expires > Date.now())
         return cached.value;
     const value = await lookup();
-    publicCache.delete(key);
-    if (publicCache.size >= PUBLIC_CACHE_LIMIT)
-        publicCache.delete(publicCache.keys().next().value);
-    const ttl = value === null ? PUBLIC_MISS_TTL_MS : PUBLIC_CACHE_TTL_MS;
-    publicCache.set(key, { value, expires: Date.now() + ttl });
+    if (value != null) {
+        publicCache.delete(key);
+        if (publicCache.size >= PUBLIC_CACHE_LIMIT)
+            publicCache.delete(publicCache.keys().next().value);
+        publicCache.set(key, { value, expires: Date.now() + PUBLIC_CACHE_TTL_MS });
+    }
     return value;
 }
 
@@ -209,6 +209,13 @@ function addressQueries(address, publicLookup) {
 }
 
 const coordinate = (value) => (typeof value === 'number' || (typeof value === 'string' && value.trim())) ? Number(value) : NaN;
+const postalDigits = (value) => String(value ?? '').replace(/\D/g, '');
+
+function pointForRoute(place) {
+    const lat = coordinate(place.lat);
+    const lon = coordinate(place.lon);
+    return Math.abs(lat) <= 90 && Math.abs(lon) <= 180 ? `${lon},${lat}` : null;
+}
 
 function matchAddress(place, requested) {
     const address = place?.address;
@@ -221,8 +228,8 @@ function matchAddress(place, requested) {
     const municipalities = [address.city, address.town, address.municipality, address.village, address.hamlet];
     if (requested.city && !municipalities.some(name => typeof name === 'string' && normalize(name) === requested.city))
         return null;
-    const matchedPostal = String(address.postcode ?? '').replace(/\D/g, '');
-    if (requested.postalCode && (matchedPostal || !requested.city) && matchedPostal !== requested.postalCode.replace('-', ''))
+    const matchedPostal = postalDigits(address.postcode);
+    if (requested.postalCode && (matchedPostal || !requested.city) && matchedPostal !== postalDigits(requested.postalCode))
         return null;
     const street = address.road || address.pedestrian || address.residential || address.square || place.name;
     if (typeof street !== 'string' || !street.trim())
@@ -239,9 +246,37 @@ function matchAddress(place, requested) {
         : !matchedNumber && (place.category === 'highway' || place.addresstype === 'road');
     if (!matchesNumber)
         return null;
-    const lat = coordinate(place.lat);
-    const lon = coordinate(place.lon);
-    return Math.abs(lat) <= 90 && Math.abs(lon) <= 180 ? `${lon},${lat}` : null;
+    return pointForRoute(place);
+}
+
+async function searchPlaces(params, options) {
+    const url = endpoint('NOMINATIM_BASE_URL', 'search', {
+        ...params, format: 'jsonv2', addressdetails: '1', countrycodes: 'br', limit: '5', 'accept-language': 'pt-BR'
+    }, options.publicLookup);
+    const response = await request(url, options);
+    if (!response.ok || !Array.isArray(response.data))
+        throw new LocationError('O serviço de geocodificação retornou uma resposta inesperada.', 502);
+    return response.data;
+}
+
+async function geocodePostalCode(requested, options) {
+    const places = await searchPlaces({ postalcode: requested.postalCode, country: 'Brasil' }, options);
+    const digits = postalDigits(requested.postalCode);
+    for (const place of places) {
+        const address = place?.address;
+        if (address?.country_code !== 'br' || !postalDigits(address.postcode).startsWith(digits))
+            continue;
+        const state = address['ISO3166-2-lvl4'];
+        if (requested.stateCode && typeof state === 'string' && state.startsWith('BR-') && state !== `BR-${requested.stateCode}`)
+            continue;
+        const municipalities = [address.city, address.town, address.municipality].filter(name => typeof name === 'string' && name.trim());
+        if (requested.city && municipalities.length && !municipalities.some(name => normalize(name.trim()) === requested.city))
+            continue;
+        const point = pointForRoute(place);
+        if (point)
+            return point;
+    }
+    return null;
 }
 
 async function geocode(address, options) {
@@ -249,19 +284,13 @@ async function geocode(address, options) {
     if (!requested)
         return null;
     for (const query of requested.queries) {
-        const url = endpoint('NOMINATIM_BASE_URL', 'search', {
-            q: query, format: 'jsonv2', addressdetails: '1', countrycodes: 'br', limit: '5', 'accept-language': 'pt-BR'
-        }, options.publicLookup);
-        const response = await request(url, options);
-        if (!response.ok || !Array.isArray(response.data))
-            throw new LocationError('O serviço de geocodificação retornou uma resposta inesperada.', 502);
-        for (const place of response.data) {
+        for (const place of await searchPlaces({ q: query }, options)) {
             const point = matchAddress(place, requested);
             if (point)
                 return point;
         }
     }
-    return null;
+    return requested.postalCode ? geocodePostalCode(requested, options) : null;
 }
 
 async function routeDistanceKm(origin, destination, options) {

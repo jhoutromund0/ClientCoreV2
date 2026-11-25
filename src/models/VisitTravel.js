@@ -17,7 +17,7 @@ async function pendingTravel(revision, limit, cachedOrigin, run = query) {
         WHERE ${routable} AND site.address IS NOT NULL
             AND (v.data#>>'{travel,revision}' IS DISTINCT FROM $1
                 OR v.data#>>'{travel,address}' IS DISTINCT FROM site.address
-                OR (v.data#>>'{travel,status}' = 'temporarily_unavailable'
+                OR (v.data#>>'{travel,status}' IN ('temporarily_unavailable', 'address_not_found')
                     AND CASE WHEN v.data#>>'{travel,retryAfter}' ~ '^[0-9]{1,18}$'
                         THEN (v.data#>>'{travel,retryAfter}')::bigint ELSE 0 END <= $3))
             AND ($4::text IS NULL OR (
