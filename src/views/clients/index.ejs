@@ -16,7 +16,7 @@
     </a>
   </div>
   <% if (clients.length) { %>
-  <div class="table-wrap">
+  <div class="table-wrap" tabindex="0" role="region" aria-label="Clientes cadastrados">
     <table>
       <thead>
         <tr>
@@ -116,11 +116,7 @@
   </section>
   <% } %>
   <%- include('../partials/pagination', { page, path: '/clientes' }) %>
-  <% if (clients.length) { %>
-  <p class="storage-note">
-    <a class="travel-attribution" href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a> ·
-    <a class="travel-attribution" href="https://project-osrm.org/">OSRM</a> ·
-    <a class="travel-attribution" href="https://www.openstreetmap.org/fixthemap">Corrigir o mapa</a>
-  </p>
+  <% if (clients.some(client => client.tripDisplay?.outboundKm)) { %>
+  <%- include('../partials/travel-attribution', { showMapCorrection: true }) %>
   <% } %>
 </main>

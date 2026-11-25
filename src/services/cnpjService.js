@@ -40,7 +40,6 @@ function formatPhone(phone) {
     const formatted = number.length > 4 ? `${number.slice(0, -4)}-${number.slice(-4)}` : number;
     return area ? `(${area}) ${formatted}` : formatted;
 }
-// Converte a resposta do CNPJá nos campos usados pelo formulário de clientes.
 function mapOffice(office) {
     const company = office.company || {};
     const address = office.address || {};
@@ -153,8 +152,7 @@ async function lookup(rawCnpj, userId) {
     let office;
     try {
         office = await response.json();
-    }
-    catch (err) {
+    } catch {
         throw new CnpjError(502, 'Resposta inesperada do serviço de consulta de CNPJ.');
     }
     if (!office || typeof office !== 'object' || Array.isArray(office))
@@ -167,4 +165,4 @@ async function lookup(rawCnpj, userId) {
     `, [cnpj, JSON.stringify(data)]);
     return { ...data, cached: false };
 }
-module.exports = { lookup, isValidCnpj, onlyDigits, formatCnpj, mapOffice, CnpjError };
+module.exports = { lookup, isValidCnpj, CnpjError };

@@ -1,4 +1,3 @@
-const { query } = require('../config/database');
 const Client = require('../models/Client');
 const Service = require('../models/Service');
 const Visit = require('../models/Visit');
@@ -69,29 +68,28 @@ function calendarUrl(month, client = '') {
     return `/calendario?${query}`;
 }
 
-function calendarDays(month, summaries) {
+function calendarDays(month, summaries, currentDate) {
     const [year, number] = month.split('-').map(Number);
     const firstWeekday = new Date(Date.UTC(year, number - 1, 1)).getUTCDay();
     const count = new Date(Date.UTC(year, number, 0)).getUTCDate();
-    const now = today();
     return Array.from({ length: firstWeekday + count }, (_, index) => {
         if (index < firstWeekday)
             return null;
         const day = index - firstWeekday + 1;
         const date = `${month}-${String(day).padStart(2, '0')}`;
-        const summary = summaries[date];
-        const preview = (summary?.preview || []).map(({ clientName, scheduledAt }) => ({
+        const preview = (summaries[date] || []).map(({ clientName, scheduledAt }) => ({
             clientName: text(clientName) || 'Empresa a vincular',
             time: splitDateTime(scheduledAt).scheduledTime
         }));
-        return { day, date, isToday: now === date, count: preview.length, preview };
+        return { day, date, isToday: currentDate === date, count: preview.length, preview };
     });
 }
 
 async function index(req, res) {
+    const currentDate = today();
     const selected = text(req.query.mes);
     const undated = selected === 'sem-data';
-    const month = monthPattern.test(selected) ? selected : today().slice(0, 7);
+    const month = monthPattern.test(selected) ? selected : currentDate.slice(0, 7);
     const search = limitedSearch(req.query.cliente);
     const previousMonth = moveMonth(month, -1);
     const nextMonth = moveMonth(month, 1);
@@ -104,33 +102,22 @@ async function index(req, res) {
         title: 'Calendário', page: { ...page, after: req.query.apos }, visits: page.items.map(visitLabels),
         month: undated ? 'sem-data' : month,
         monthLabel: monthName.format(new Date(`${month}-01T00:00:00Z`)),
-        todayUrl: calendarUrl(today().slice(0, 7)), previousUrl: previousMonth && calendarUrl(previousMonth, search),
+        todayUrl: calendarUrl(currentDate.slice(0, 7)), previousUrl: previousMonth && calendarUrl(previousMonth, search),
         nextUrl: nextMonth && calendarUrl(nextMonth, search), undated, hasUndated, search,
-        days: undated ? [] : calendarDays(month, page.days),
-        total: Object.values(page.days).reduce((count, day) => count + day.count, 0)
+        days: undated ? [] : calendarDays(month, page.days, currentDate),
+        total: Object.values(page.days).reduce((count, visits) => count + visits.length, 0)
     });
-}
-
-async function clientOptions(search) {
-    const options = await Client.options(search);
-    if (!options.length)
-        return options;
-    const { rows } = await query("SELECT id, data->>'address' AS address FROM clients WHERE id = ANY($1::uuid[])", [options.map(({ id }) => id)]);
-    const addresses = new Map(rows.map(({ id, address }) => [id, text(address)]));
-    return options.map(option => ({ ...option, address: addresses.get(option.id) || '' }));
 }
 
 function serviceOptions(services, user) {
     return services.map(({ id, name, priceCents }) => ({ id, name, ...(user.role === 'admin' ? { priceCents } : {}) }));
 }
 
-function mergeOptions(first, existing, idKey = 'id') {
+function mergeOptions(first, existing) {
     const options = new Map(first.map(option => [option.id, option]));
-    for (const option of existing) {
-        const id = option[idKey];
-        if (!options.has(id))
-            options.set(id, { ...option, id });
-    }
+    for (const option of existing)
+        if (!options.has(option.id))
+            options.set(option.id, option);
     return [...options.values()];
 }
 
@@ -146,7 +133,6 @@ function formDraft(visit, requestedDay, selectedClient) {
         clientName: visit?.clientName || selectedClient?.company || selectedClient?.name || '',
         serviceId: visit?.serviceId || '',
         description: visit?.description || '',
-        // O valor congelado já está no cadastro da visita e reaparece como orientação para o administrador.
         servicePrice: '',
         address: visit?.address || selectedClient?.address || '',
         status: visit?.status || 'agendada',
@@ -171,7 +157,7 @@ function returnUrl(source, { id, scheduledAt, scheduledDate } = {}) {
 async function renderForm(req, res, draft, visit, errors = [], code = 200) {
     const source = (req.body?.retorno || req.query.retorno) === 'visitas' ? 'visitas' : '';
     const [clientsFound, servicesFound, assigneesFound, materialsFound, selectedClient, selectedService, selectedAssignees, selectedMaterials] = await Promise.all([
-        clientOptions(''), Service.catalog(''), VisitResources.searchAssignees(''), VisitResources.searchMaterials(''),
+        Client.options(), Service.catalog(), VisitResources.searchAssignees(), VisitResources.searchMaterials(),
         draft.clientId ? Client.find(draft.clientId) : null,
         draft.serviceId ? Service.find(draft.serviceId) : null,
         VisitResources.findAssignees(draft.assigneeIds),
@@ -197,7 +183,7 @@ function draftFromBody(body, visit) {
     const scheduled = Object.hasOwn(body, 'scheduledDate') ? {
         scheduledDate: text(body.scheduledDate), scheduledTime: text(body.scheduledTime)
     } : splitDateTime(body.scheduledAt);
-    const materialIds = list(body.materialId).slice(0, 26);
+    const materialIds = list(body.materialId);
     const planned = list(body.plannedQuantity);
     const used = list(body.usedQuantity);
     return {
@@ -216,10 +202,10 @@ function draftFromBody(body, visit) {
         travelPayeeId: body.travelPayeeId === undefined ? visit?.travelPayeeId || '' : text(body.travelPayeeId).toLowerCase(),
         outboundKm: body.outboundKm === undefined ? kilometersField(visit?.manualTravel?.outboundMeters) : text(body.outboundKm),
         roundTripKm: body.roundTripKm === undefined ? kilometersField(visit?.manualTravel?.roundTripMeters) : text(body.roundTripKm),
-        materials: materialIds.map((materialId, index) => ({
+        materials: materialIds.slice(0, 26).map((materialId, index) => ({
             materialId: text(materialId).toLowerCase(), plannedQuantity: text(planned[index]), usedQuantity: text(used[index])
         })),
-        materialsMalformed: planned.length !== list(body.materialId).length || used.length !== list(body.materialId).length,
+        materialsMalformed: planned.length !== materialIds.length || used.length !== materialIds.length,
         official
     };
 }
@@ -359,11 +345,10 @@ async function cancel(req, res) {
 }
 
 async function remove(req, res) {
-    const visit = await Visit.find(req.params.id);
-    if (!visit)
-        return notFound(res);
+    let visit;
     try {
-        if (!await Visit.delete(visit.id))
+        visit = await Visit.remove(req.params.id);
+        if (!visit)
             return notFound(res);
     } catch (error) {
         if (error instanceof Visit.ConflictError)
@@ -395,7 +380,7 @@ async function operationalDetail(req, res) {
 
 module.exports = {
     index, newForm, editForm, cancel, remove, operationalIndex, operationalDetail,
-    clients: async (req, res) => res.json({ clients: await clientOptions(limitedSearch(req.query.busca)) }),
+    clients: async (req, res) => res.json({ clients: await Client.options(limitedSearch(req.query.busca)) }),
     services: async (req, res) => res.json({ options: serviceOptions(await Service.catalog(limitedSearch(req.query.busca)), req.user) }),
     assignees: async (req, res) => res.json({ options: await VisitResources.searchAssignees(limitedSearch(req.query.busca)) }),
     materials: async (req, res) => res.json({ options: await VisitResources.searchMaterials(limitedSearch(req.query.busca)) }),

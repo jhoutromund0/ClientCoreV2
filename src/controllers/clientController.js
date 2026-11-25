@@ -99,7 +99,6 @@ exports.remove = async (req, res) => {
     await req.setFlash({ type: 'success', message: 'Cliente excluído com sucesso.' });
     res.redirect('/clientes');
 };
-// Consulta de CNPJ (CNPJá). Feita pelo servidor para respeitar o CSP e o limite de 5 consultas/min do provedor.
 exports.lookupCnpj = async (req, res, next) => {
     try {
         const data = await cnpjService.lookup(req.params.cnpj, req.user.id);

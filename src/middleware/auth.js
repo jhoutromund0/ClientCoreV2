@@ -1,6 +1,7 @@
 const { createHash, createHmac, randomBytes, timingSafeEqual } = require('node:crypto');
 const { query, withTransaction } = require('../config/database');
 const { report } = require('../services/loginThrottle');
+const asyncHandler = require('./asyncHandler');
 
 const secret = process.env.SESSION_SECRET;
 if (!secret || secret.length < 32)
@@ -93,71 +94,68 @@ async function takeFlash(sessionHash) {
     return rows[0]?.flash || null;
 }
 
-async function load(req, res, next) {
-    try {
-        req.user = null;
-        req.session = null;
-        req.csrfSeed = null;
-        res.locals.user = null;
-        res.locals.csrfToken = null;
-        req.setFlash = async flash => {
-            if (req.session)
-                await query('UPDATE sessions SET flash = $2 WHERE token_hash = $1', [req.session.hash, flash]);
-        };
+async function loadSession(req, res, next) {
+    const token = readCookie(req, cookieName);
+    if (!token) return;
 
-        const token = readCookie(req, cookieName);
-        if (token) {
-            const sessionHash = hash(token);
-            const { rows } = await query(`
-                UPDATE sessions AS s SET
-                    last_seen_at = GREATEST(s.last_seen_at, NOW()),
-                    expires_at = LEAST(GREATEST(s.expires_at, NOW() + make_interval(mins => $2)), s.absolute_expires_at)
-                FROM users AS u
-                WHERE s.token_hash = $1 AND s.user_id = u.id AND u.active
-                    AND s.expires_at > NOW() AND s.absolute_expires_at > NOW()
-                RETURNING u.id, u.name, u.email, u.role, s.id AS session_id, s.csrf_token, s.expires_at
-            `, [sessionHash, idleMinutes]);
-            const session = rows[0];
-            if (session) {
-                const { id, name, email, role } = session;
-                req.user = res.locals.user = { id, name, email, role };
-                req.session = { id: session.session_id, hash: sessionHash };
-                applyCsrf(req, res, session.csrf_token);
-                setSessionCookie(res, token, session.expires_at);
-                if (req.method === 'GET') {
-                    const render = res.render.bind(res);
-                    res.render = (view, options, callback) => takeFlash(sessionHash).then(flash => {
-                        res.locals.flash = flash;
-                        render(view, options, callback);
-                    }, error => {
-                        res.render = render;
-                        next(error);
-                    });
-                }
-            } else {
-                res.clearCookie(cookieName, cookieOptions);
-            }
-        }
-
-        if (isFormPath(req)) {
-            res.set('Cache-Control', 'no-store');
-            if (!req.user) {
-                let seed = readCookie(req, formCookieName);
-                if (safeMethods.has(req.method)) {
-                    seed ||= randomToken();
-                    setCookie(res, formCookieName, seed, csrfPeriod * 2);
-                }
-                if (seed) applyCsrf(req, res, seed);
-            }
-        }
-        next();
-    } catch (error) {
-        next(error);
+    const sessionHash = hash(token);
+    const { rows: [session] } = await query(`
+        UPDATE sessions AS s SET
+            last_seen_at = GREATEST(s.last_seen_at, NOW()),
+            expires_at = LEAST(GREATEST(s.expires_at, NOW() + make_interval(mins => $2)), s.absolute_expires_at)
+        FROM users AS u
+        WHERE s.token_hash = $1 AND s.user_id = u.id AND u.active
+            AND s.expires_at > NOW() AND s.absolute_expires_at > NOW()
+        RETURNING u.id, u.name, u.email, u.role, s.id AS session_id, s.csrf_token, s.expires_at
+    `, [sessionHash, idleMinutes]);
+    if (!session) {
+        res.clearCookie(cookieName, cookieOptions);
+        return;
     }
+
+    const { id, name, email, role } = session;
+    req.user = res.locals.user = { id, name, email, role };
+    req.session = { id: session.session_id, hash: sessionHash };
+    applyCsrf(req, res, session.csrf_token);
+    setSessionCookie(res, token, session.expires_at);
+
+    if (req.method !== 'GET') return;
+    const render = res.render.bind(res);
+    res.render = (view, options, callback) => takeFlash(sessionHash).then(flash => {
+        res.locals.flash = flash;
+        render(view, options, callback);
+    }, error => {
+        res.render = render;
+        next(error);
+    });
 }
+
+const load = asyncHandler(async (req, res, next) => {
+    Object.assign(req, { user: null, session: null, csrfSeed: null });
+    Object.assign(res.locals, { user: null, csrfToken: null });
+    req.setFlash = async flash => {
+        if (req.session)
+            await query('UPDATE sessions SET flash = $2 WHERE token_hash = $1', [req.session.hash, flash]);
+    };
+
+    await loadSession(req, res, next);
+    if (isFormPath(req)) {
+        res.set('Cache-Control', 'no-store');
+        if (!req.user) {
+            let seed = readCookie(req, formCookieName);
+            if (safeMethods.has(req.method)) {
+                seed ||= randomToken();
+                setCookie(res, formCookieName, seed, csrfPeriod * 2);
+            }
+            if (seed) applyCsrf(req, res, seed);
+        }
+    }
+    next();
+});
 
 async function create(req, res, user) {
     const token = randomToken();
+    const tokenHash = hash(token);
     const session = await withTransaction(async client => {
         const { rows: current } = await client.query(
             'SELECT id FROM users WHERE id = $1 AND active AND password_hash = $2 FOR UPDATE',
@@ -169,7 +167,7 @@ async function create(req, res, user) {
             VALUES ($1, $2, $3, NOW() + make_interval(mins => $4),
                 NOW() + make_interval(hours => $5), $6, $7)
             RETURNING expires_at
-        `, [hash(token), user.id, randomToken(), idleMinutes, absoluteHours,
+        `, [tokenHash, user.id, randomToken(), idleMinutes, absoluteHours,
             req.get('user-agent')?.slice(0, 512) || null, req.ip || null]);
         await client.query(`
             DELETE FROM sessions WHERE user_id = $1 AND token_hash <> $2 AND (
@@ -179,7 +177,7 @@ async function create(req, res, user) {
                     ORDER BY last_seen_at DESC, created_at DESC, id DESC OFFSET $3
                 )
             )
-        `, [user.id, hash(token), maxSessions - 1]);
+        `, [user.id, tokenHash, maxSessions - 1]);
         return rows[0];
     });
     if (!session) return false;

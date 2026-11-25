@@ -3,6 +3,9 @@ const auditContext = require('../services/auditContext');
 if (!process.env.DATABASE_URL)
     throw new Error('DATABASE_URL é obrigatória. Configure o PostgreSQL antes de iniciar.');
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false' } : false });
+pool.on('error', error => {
+    console.error({ event: 'database_idle_connection_error', code: error.code || error.name });
+});
 
 async function withTransaction(work) {
     const client = await pool.connect();

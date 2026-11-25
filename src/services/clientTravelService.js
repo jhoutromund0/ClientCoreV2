@@ -1,3 +1,4 @@
+const { setTimeout: delay } = require('node:timers/promises');
 const { pool } = require('../config/database');
 const Client = require('../models/Client');
 const VisitTravel = require('../models/VisitTravel');
@@ -12,6 +13,10 @@ const statuses = {
     route_not_found: 'Rota de carro indisponível para este endereço.',
     temporarily_unavailable: 'Serviço de rotas indisponível. Tente novamente mais tarde.'
 };
+const pending = { statusMessage: 'Quilometragem a calcular.', canCalculate: true };
+
+const validMeters = meters => Number.isFinite(meters) && meters >= 0 && Number.isSafeInteger(Math.round(meters * 1000));
+const kilometersToMeters = km => Math.round(km * 1000000) / 1000;
 
 function describe(client, settings, addressError = statuses.address_not_found) {
     const address = client.address;
@@ -19,19 +24,16 @@ function describe(client, settings, addressError = statuses.address_not_found) {
         return { statusMessage: 'Informe o endereço para calcular o deslocamento.' };
 
     const travel = client.travel;
-    if (travel?.revision !== settings.revision || travel.address !== address) {
-        return {
-            statusMessage: location.isConfigured()
-                ? 'Cálculo de deslocamento pendente.'
-                : 'Quilometragem a calcular.',
-            canCalculate: true
-        };
-    }
+    if (travel?.revision !== settings.revision || travel.address !== address)
+        return pending;
     if (travel.status !== 'ready')
         return {
-            statusMessage: travel.status === 'address_not_found' ? addressError : (statuses[travel.status] || 'Cálculo de deslocamento pendente.'),
+            statusMessage: travel.status === 'address_not_found' ? addressError : (statuses[travel.status] || pending.statusMessage),
             canCalculate: true
         };
+    if (!validMeters(travel.outboundMeters) || !validMeters(travel.roundTripMeters)
+        || travel.roundTripMeters < travel.outboundMeters)
+        return pending;
 
     return {
         statusMessage: travel.outboundCostCents == null ? 'Tarifa por km pendente.' : '',
@@ -43,11 +45,9 @@ function describe(client, settings, addressError = statuses.address_not_found) {
 }
 
 function travelCostCents(meters, rate) {
-    if (!Number.isFinite(meters) || meters < 0 || !Number.isSafeInteger(rate) || rate < 0)
+    if (!validMeters(meters) || !Number.isSafeInteger(rate) || rate < 0)
         return null;
     const millimeters = Math.round(meters * 1000);
-    if (!Number.isSafeInteger(millimeters))
-        return null;
     const cents = (BigInt(millimeters) * BigInt(rate) + 500000n) / 1000000n;
     const amount = Number(cents);
     return Number.isSafeInteger(amount) ? amount : null;
@@ -55,7 +55,7 @@ function travelCostCents(meters, rate) {
 
 function priceRoute(travel, distances, rate) {
     const { outboundMeters, returnMeters } = distances;
-    const roundTripMeters = outboundMeters + returnMeters;
+    const roundTripMeters = Math.round((outboundMeters + returnMeters) * 1000) / 1000;
     return {
         ...travel,
         status: 'ready',
@@ -69,27 +69,39 @@ function priceRoute(travel, distances, rate) {
 
 function reusableRoute(result, address, originAddress) {
     return result?.address === address && result.originAddress === originAddress && result.status === 'ready'
-        && Number.isFinite(result.outboundMeters) && Number.isFinite(result.returnMeters);
+        && validMeters(result.outboundMeters) && validMeters(result.returnMeters)
+        && validMeters(result.outboundMeters + result.returnMeters);
 }
 
-async function resolveTravel(travel, origin, rate, service) {
-    if (!origin)
-        return { ...travel, status: 'origin_not_found' };
+async function resolveTravel(address, settings, reusable, distanceKm) {
+    const { originAddress, revision, rateCentsPerKm } = settings;
+    const travel = { address, originAddress, revision };
+    if (reusable)
+        return priceRoute(travel, reusable, rateCentsPerKm);
 
-    travel.destination ??= travel.address === travel.originAddress ? origin : await service.geocode(travel.address);
-    if (!travel.destination)
-        return { ...travel, status: 'address_not_found' };
-
-    const distances = await service.drivingDistances(origin, travel.destination);
-    return distances ? priceRoute(travel, distances, rate) : { ...travel, status: 'route_not_found' };
+    try {
+        const outboundKm = await distanceKm(originAddress, address);
+        if (outboundKm === null)
+            return { ...travel, status: 'route_not_found' };
+        const returnKm = address === originAddress ? outboundKm : await distanceKm(address, originAddress);
+        if (returnKm === null)
+            return { ...travel, status: 'route_not_found' };
+        const outboundMeters = kilometersToMeters(outboundKm);
+        const returnMeters = kilometersToMeters(returnKm);
+        return priceRoute(travel, { outboundMeters, returnMeters }, rateCentsPerKm);
+    } catch (error) {
+        if (!(error instanceof location.LocationError))
+            throw error;
+        if (error.reason)
+            return { ...travel, status: error.reason };
+        const delay = Math.min(2147483647, Math.max(60, error.retryAfter || 0) * 1000);
+        return { ...travel, status: 'temporarily_unavailable', retryAfter: Date.now() + delay };
+    }
 }
 
-function retryDelay(error) {
-    return Math.min(2147483647, Math.max(60, error.retryAfter || 0) * 1000);
-}
-
-async function processBatch(run) {
+async function processBatch(run, signal) {
     const settings = await TransportSettings.get(run);
+    const configured = location.isConfigured();
     const jobs = [];
     async function collect(cachedOrigin, limit) {
         for (const store of [Client, VisitTravel]) {
@@ -98,46 +110,27 @@ async function processBatch(run) {
         }
     }
     await collect(settings.originAddress, 25);
-    if (!jobs.length && location.isConfigured())
+    if (!jobs.length && configured)
         await collect(null, 5);
     const routes = new Map();
-    let origin;
+    const distanceKm = location.createDistanceLookup({ signal });
+    let worked = false;
     for (const { store, record } of jobs) {
+        signal.throwIfAborted();
         const { address } = record;
-        const previous = [record.travel, record.clientTravel].find(result => result?.address === address);
         const reusable = [routes.get(address), record.travel, record.clientTravel].find(result =>
             reusableRoute(result, address, settings.originAddress));
-        const travel = {
-            revision: settings.revision,
-            address,
-            originAddress: settings.originAddress,
-            destination: reusable?.destination ?? previous?.destination ?? null
-        };
-
-        let result;
-        try {
-            if (reusable) {
-                result = priceRoute(travel, reusable, settings.rateCentsPerKm);
-            } else {
-                if (origin === undefined)
-                    origin = await location.geocode(settings.originAddress);
-                result = await resolveTravel(travel, origin, settings.rateCentsPerKm, location);
-            }
-        } catch (error) {
-            if (!(error instanceof location.LocationError))
-                throw error;
-            const delay = retryDelay(error);
-            await store.saveTravel(record.id, address, {
-                ...travel, status: 'temporarily_unavailable', retryAfter: Date.now() + delay
-            }, run);
-            return delay;
-        }
-
+        if (!reusable && !configured)
+            continue;
+        const result = await resolveTravel(address, settings, reusable, distanceKm);
+        signal.throwIfAborted();
         if (result.status === 'ready')
             routes.set(address, result);
-        await store.saveTravel(record.id, address, result, run);
+        worked = await store.saveTravel(record.id, address, result, run) || worked;
+        if (result.status === 'temporarily_unavailable')
+            return Math.max(0, result.retryAfter - Date.now());
     }
-    return jobs.length ? 1000 : 5000;
+    return worked ? 1000 : 5000;
 }
 
 async function withTravelLock(work, busy) {
@@ -162,10 +155,6 @@ async function withTravelLock(work, busy) {
     }
 }
 
-function refreshPendingTravel() {
-    return withTravelLock(processBatch, 5000);
-}
-
 async function calculateClientTravel(id, { publicUse, expectedAddress, expectedRevision }) {
     const changed = { type: 'error', message: 'Os dados do deslocamento mudaram. Confira os endereços e tente novamente.' };
     const busy = { type: 'info', message: 'Há outro deslocamento em cálculo. Tente novamente em instantes.' };
@@ -177,7 +166,7 @@ async function calculateClientTravel(id, { publicUse, expectedAddress, expectedR
         if (!address)
             return { type: 'error', message: 'Cadastre o endereço do cliente antes de calcular a quilometragem.' };
         const settings = await TransportSettings.get(run);
-        const { originAddress, revision, rateCentsPerKm } = settings;
+        const { originAddress, revision } = settings;
         if (expectedAddress !== address || expectedRevision !== revision)
             return changed;
 
@@ -189,21 +178,8 @@ async function calculateClientTravel(id, { publicUse, expectedAddress, expectedR
         if (sameRoute && previous.status === 'temporarily_unavailable' && previous.retryAfter > Date.now())
             return { type: 'error', message: statuses.temporarily_unavailable };
 
-        const travel = { address, originAddress, revision, destination: sameRoute ? previous.destination : null };
-        let result;
-        try {
-            if (reusable) {
-                result = priceRoute(travel, previous, rateCentsPerKm);
-            } else {
-                const service = publicLookup ? location.publicServices : location;
-                const origin = await service.geocode(originAddress);
-                result = await resolveTravel(travel, origin, rateCentsPerKm, service);
-            }
-        } catch (error) {
-            if (!(error instanceof location.LocationError))
-                throw error;
-            result = { ...travel, status: 'temporarily_unavailable', retryAfter: Date.now() + retryDelay(error) };
-        }
+        const distanceKm = location.createDistanceLookup({ publicLookup });
+        const result = await resolveTravel(address, settings, reusable ? previous : null, distanceKm);
         if (!await Client.saveTravel(id, address, result, run))
             return changed;
         if (result.status === 'ready')
@@ -212,30 +188,28 @@ async function calculateClientTravel(id, { publicUse, expectedAddress, expectedR
     }, busy);
 }
 
-function start() {
-    let stopped = false;
-    let timer;
-    let running;
-    async function tick() {
-        let delay = 60000;
+async function runWorker(signal) {
+    let wait = 0;
+    while (!signal.aborted) {
         try {
-            delay = await refreshPendingTravel();
+            await delay(wait, undefined, { signal, ref: false });
+            wait = await withTravelLock(run => processBatch(run, signal), 5000);
         } catch (error) {
+            if (signal.aborted)
+                return;
             console.error('Não foi possível atualizar as rotas dos atendimentos e clientes.', error.code || error.name);
-        } finally {
-            if (!stopped)
-                timer = setTimeout(run, delay).unref();
+            wait = 60000;
         }
     }
-    function run() {
-        running = tick();
-    }
-    timer = setTimeout(run, 0).unref();
+}
+
+function start() {
+    const stop = new AbortController();
+    const running = runWorker(stop.signal);
     return () => {
-        stopped = true;
-        clearTimeout(timer);
+        stop.abort();
         return running;
     };
 }
 
-module.exports = { describe, calculateClientTravel, refreshPendingTravel, start, travelCostCents };
+module.exports = { describe, calculateClientTravel, start, travelCostCents };

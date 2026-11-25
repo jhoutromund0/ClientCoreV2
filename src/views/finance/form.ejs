@@ -60,7 +60,7 @@
         <% if (state.travel.payeeName) { %><div><dt>Quem recebe</dt><dd><%= state.travel.payeeName %></dd></div><% } %>
       </dl>
       <% if (state.travel.source !== 'manual') { %>
-      <p class="muted form-hint"><a class="travel-attribution" href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a></p>
+      <%- include('../partials/travel-attribution', { showMapCorrection: false }) %>
       <% } %>
       <% } else { %>
       <p class="muted"><%= state.travelDescription.statusMessage %></p>

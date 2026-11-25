@@ -20,7 +20,45 @@ document.addEventListener('submit', (event) => {
     if (message && !window.confirm(message))
         event.preventDefault();
 });
-// Preenchimento automático por CNPJ (consulta via servidor -> CNPJá).
+
+const optionSearch = (() => {
+    const pending = new WeakMap();
+
+    function cancel(input) {
+        const search = pending.get(input);
+        if (!search)
+            return;
+        clearTimeout(search.timer);
+        search.controller.abort();
+        pending.delete(input);
+    }
+
+    function start(input, path, onResult, onError) {
+        cancel(input);
+        const controller = new AbortController();
+        const timer = setTimeout(async () => {
+            try {
+                const query = new URLSearchParams({ busca: input.value.trim() });
+                const response = await fetch(`${path}?${query}`, { signal: controller.signal });
+                if (!response.ok)
+                    throw new Error('Consulta indisponível.');
+                const result = await response.json();
+                if (!controller.signal.aborted)
+                    onResult(result);
+            } catch {
+                if (!controller.signal.aborted)
+                    onError();
+            } finally {
+                if (pending.get(input)?.controller === controller)
+                    pending.delete(input);
+            }
+        }, 250);
+        pending.set(input, { controller, timer });
+    }
+
+    return { start, cancel };
+})();
+
 document.addEventListener('DOMContentLoaded', () => {
     const form = document.querySelector('.client-form');
     if (!form)

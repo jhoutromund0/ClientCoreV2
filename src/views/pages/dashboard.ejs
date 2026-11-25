@@ -100,9 +100,6 @@ const materialPeak = Math.max(1, ...topMaterials.map((material) => material.visi
           <li><%= name %></li>
           <% }) %>
         </ul>
-        <% if (leader.names.length === 1 && Number.isInteger(leader.visits)) { %>
-        <p class="muted"><%= formatCount.format(leader.visits) %> <%= leader.visits === 1 ? 'atendimento com distância calculada' : 'atendimentos com distância calculada' %></p>
-        <% } %>
       </div>
       <% } else { %>
       <p class="muted dashboard-empty">Nenhum atendimento com distância calculada e analista identificado neste período.</p>

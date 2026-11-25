@@ -3,31 +3,28 @@
     <div>
       <span class="eyebrow">ESTOQUE</span>
       <h1>Materiais</h1>
-      <p class="muted">Controle os materiais por quantidade, metro ou kg, com o valor calculado pelo tipo de uso.</p>
     </div>
-    <a class="button" href="/materiais" id="novo-material">+ Novo material</a>
+    <a class="button" href="/materiais#material-form">+ Novo material</a>
   </div>
 
-  <div class="stats-grid" id="material-stats">
+  <div class="stats-grid">
     <div class="stat-card"><span>Itens cadastrados</span><strong><%= Number(summary.count).toLocaleString('pt-BR') %></strong><small>Considerando a busca atual</small></div>
     <div class="stat-card"><span>Medida total</span><strong class="stat-text"><%= Number(summary.measure).toLocaleString('pt-BR', { maximumFractionDigits: 2 }) %></strong><small>Soma das quantidades e medidas</small></div>
     <div class="stat-card"><span>Valor em estoque</span><strong class="stat-text"><%= Number(summary.value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) %></strong><small>Medida × valor unitário</small></div>
   </div>
 
   <div class="split-layout">
-    <form id="material-form" class="panel-form" method="post" action="<%= materialData && materialData.id ? '/materiais/' + materialData.id : '/materiais' %>" autocomplete="off">
+    <form id="material-form" class="panel-form" method="post" action="<%= materialData && materialData.id ? '/materiais/' + materialData.id : '/materiais' %>" autocomplete="off" aria-labelledby="form-title">
       <%- include('../partials/csrf-field') %>
       <% if (materialData?.revision) { %><input name="revision" type="hidden" value="<%= materialData.revision %>"><% } %>
       <h2 id="form-title"><%= materialData && materialData.id ? 'Editar material' : 'Adicionar material' %></h2>
       <% if (errors && errors.length) { %>
         <div class="validation-errors" role="alert"><strong>Revise os campos:</strong><ul><% errors.forEach(error => { %><li><%= error.msg %></li><% }) %></ul></div>
-      <% } else { %>
-        <p id="form-status" class="muted form-hint"><%= materialData && materialData.id ? 'Atualize os dados e salve.' : 'Pronto para cadastrar um novo material.' %></p>
       <% } %>
 
       <div class="form-grid one-col">
         <label>Nome
-          <input id="material-nome" name="name" value="<%= materialData ? materialData.name : '' %>" maxlength="120" placeholder="Ex: Cabo CAT6" required>
+          <input name="name" value="<%= materialData ? materialData.name : '' %>" maxlength="120" placeholder="Cabo CAT6" required>
         </label>
         <label>Controle por
           <select id="material-tipo-medida" name="measureType">
@@ -37,16 +34,16 @@
         </label>
         <label>
           <span id="medida-label"><%= materialData && materialData.measureType === 'comprimento' ? 'Comprimento' : 'Quantidade' %></span>
-          <input id="material-medida" name="measure" type="number" min="0" max="1000000" step="any" value="<%= materialData && materialData.measure !== '' && materialData.measure != null ? materialData.measure : '' %>" placeholder="0" required>
+          <input name="measure" type="number" min="0" max="1000000" step="any" value="<%= materialData && materialData.measure !== '' && materialData.measure != null ? materialData.measure : '' %>" placeholder="0" required>
         </label>
         <label id="unidade-medida-wrapper" <%= materialData && materialData.measureType === 'comprimento' ? '' : 'hidden' %>>Unidade
-          <select id="material-unidade-medida" name="unit">
+          <select name="unit">
             <option value="m" <%= !materialData || materialData.unit !== 'kg' ? 'selected' : '' %>>Metro</option>
             <option value="kg" <%= materialData && materialData.unit === 'kg' ? 'selected' : '' %>>Kg</option>
           </select>
         </label>
         <label>Custo unitário (R$)
-          <input id="material-valor" name="unitValue" type="number" min="0" max="100000000" step="0.01" value="<%= materialData && materialData.unitValue !== '' && materialData.unitValue != null ? materialData.unitValue : '' %>" placeholder="0,00" required>
+          <input name="unitValue" type="number" min="0" max="100000000" step="0.01" value="<%= materialData && materialData.unitValue !== '' && materialData.unitValue != null ? materialData.unitValue : '' %>" placeholder="0,00" required>
         </label>
         <% if (user?.role === 'admin') { %>
           <label>Preço unitário a cobrar (R$)
@@ -55,8 +52,8 @@
         <% } %>
       </div>
       <div class="form-actions">
-        <% if (materialData && materialData.id) { %><a class="button button-ghost" id="cancelar-edicao" href="/materiais">Cancelar</a><% } %>
-        <button class="button" id="submit-material" type="submit"><%= materialData && materialData.id ? 'Atualizar material' : 'Salvar material' %> →</button>
+        <% if (materialData && materialData.id) { %><a class="button button-ghost" href="/materiais">Cancelar</a><% } %>
+        <button class="button" type="submit"><%= materialData && materialData.id ? 'Atualizar material' : 'Salvar material' %> →</button>
       </div>
     </form>
 
@@ -64,29 +61,28 @@
       <div class="panel-head">
         <div>
           <h2>Lista de materiais</h2>
-          <p class="muted">Nome, medida, valor e total de cada item.</p>
         </div>
         <form method="get" action="/materiais">
           <label class="search-field">Buscar material
-            <input id="buscar-material" name="busca" type="search" placeholder="Nome ou tipo" value="<%= search %>" maxlength="120">
+            <input name="busca" type="search" placeholder="Nome ou tipo" value="<%= search %>" maxlength="120">
           </label>
           <button class="button button-ghost" type="submit">Buscar</button>
           <% if (search) { %><a class="text-button" href="/materiais">Limpar</a><% } %>
         </form>
       </div>
-      <div class="table-wrap">
+      <div class="table-wrap"<% if (materials.length) { %> tabindex="0" role="region" aria-label="Materiais cadastrados"<% } %>>
         <% if (materials.length) { %>
         <table>
           <caption class="sr-only">Materiais cadastrados, valores e ações disponíveis</caption>
           <thead>
             <tr><th>Nome</th><th>Tipo</th><th>Saldo</th><th>Custo unitário</th><th>Custo total</th><th>Ações</th></tr>
           </thead>
-          <tbody id="materiais-lista">
+          <tbody>
             <% materials.forEach(item => { %>
               <tr>
                 <td><strong><%= item.name %></strong></td>
                 <td><%= item.measureType === 'comprimento' ? 'Comprimento' : 'Quantidade' %></td>
-                <td class="measure-cell"><%= Number(item.measure).toLocaleString('pt-BR', { maximumFractionDigits: 3 }) %> <%= item.measureType === 'comprimento' ? item.unit : 'un' %></td>
+                <td><%= Number(item.measure).toLocaleString('pt-BR', { maximumFractionDigits: 3 }) %> <%= item.measureType === 'comprimento' ? item.unit : 'un' %></td>
                 <td><%= Number(item.unitValue).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) %></td>
                 <td><%= (Number(item.measure) * Number(item.unitValue)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) %></td>
                 <td class="actions">

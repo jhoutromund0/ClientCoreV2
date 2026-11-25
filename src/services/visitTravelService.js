@@ -26,7 +26,7 @@ function reimbursement(visit, settings) {
 
 function routeDistances(visit, settings) {
     const route = visit.travel;
-    if (route?.status === 'ready' && route.address === visit.address &&
+    if (hasDistances(route) && route.status === 'ready' && route.address === visit.address &&
         (route.originAddress === settings.originAddress || (!route.originAddress && route.revision === settings.revision)))
         return route;
     return null;
@@ -37,7 +37,7 @@ function snapshot(visit, settings) {
         return null;
     const manual = hasDistances(visit.manualTravel);
     const distances = manual ? visit.manualTravel : routeDistances(visit, settings);
-    if (!hasDistances(distances))
+    if (!distances)
         return null;
     const { outboundMeters, roundTripMeters } = distances;
     const payment = reimbursement(visit, settings);
@@ -70,9 +70,9 @@ function describe(visit, settings) {
             visit.assignees?.length > 1 && !payment.payeeId
     };
     if (!trip) {
-        const automatic = clientTravel.describe(visit, settings, 'Endereço do atendimento não localizado. Confira os dados da visita.');
         const statusMessage = visit.status === 'cancelada' ? 'Deslocamento cancelado.' :
-            visit.billingFinalized ? 'Quilometragem ausente no lançamento.' : automatic.statusMessage;
+            visit.billingFinalized ? 'Quilometragem ausente no lançamento.' :
+                clientTravel.describe(visit, settings, 'Endereço do atendimento não localizado. Confira os dados da visita.').statusMessage;
         return { ...display, statusMessage };
     }
     return {

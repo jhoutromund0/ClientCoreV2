@@ -1,7 +1,7 @@
 const { query, write } = require('./database');
 const { randomUUID } = require('node:crypto');
 const { isUuid, readCursor, pageFrom } = require('../utils/pagination');
-const mapping = { clients: 'clients', materials: 'materials', visits: 'visits', financial: 'financial_records' };
+const mapping = { clients: 'clients', materials: 'materials', financial: 'financial_records' };
 const preservedData = column => `CASE WHEN jsonb_typeof(${column}) = 'object'
     THEN ${column} ELSE jsonb_build_object('legacyData', ${column}) END`;
 

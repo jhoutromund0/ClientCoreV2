@@ -75,10 +75,9 @@ function readTechnicians(value, userAliases) {
     return { people, label: [...labels].join(', ') };
 }
 
-function rankMaterials(visits, financialByVisit) {
+function rankMaterials(entries) {
     const totals = new Map();
-    for (const visit of visits) {
-        const record = financialByVisit.get(visit.id);
+    for (const { visit, record } of entries) {
         if (key(visit.description) === 'orcamento' && ['pendente', 'recusado'].includes(record?.status))
             continue;
         // A vírgula entre dois dígitos pode fazer parte de uma medida.
@@ -156,7 +155,6 @@ async function load(requestedPeriod, now = new Date()) {
         query('SELECT id, name, email, role FROM users WHERE role = $1', ['analista']),
         TransportSettings.get()
     ]);
-    const financialByVisit = new Map(entries.map(({ visit, record }) => [visit.id, record]));
     const userAliases = indexAliases(users.rows, (user) => [user.name, user.email]);
     const usersById = new Map(users.rows.map(user => [user.id, user]));
     const bars = attendanceBars(dates.start, dates.end, barInterval);
@@ -164,12 +162,13 @@ async function load(requestedPeriod, now = new Date()) {
     const monthlyVisits = [];
     const totals = new Map();
 
-    for (const { visit, client } of entries) {
+    for (const entry of entries) {
+        const { visit, client } = entry;
         const day = visitDay(visit.scheduledAt);
         if (!Number.isFinite(day) || visit.status === 'cancelada')
             continue;
         if (day >= dates.monthStart && day <= dates.today)
-            monthlyVisits.push(visit);
+            monthlyVisits.push(entry);
         if (day < dates.start || day > dates.end)
             continue;
         const technicians = visit.assignees?.length ? {
@@ -201,7 +200,7 @@ async function load(requestedPeriod, now = new Date()) {
         monthLabel: currentMonth,
         appointments,
         attendanceBars: bars,
-        topMaterials: rankMaterials(monthlyVisits, financialByVisit),
+        topMaterials: rankMaterials(monthlyVisits),
         leader: distanceLeader(totals)
     };
 }

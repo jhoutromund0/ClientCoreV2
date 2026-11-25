@@ -1,5 +1,5 @@
 const dashboardService = require('../services/dashboardService');
-const render = (view, title, extra = {}) => (req, res) => res.render(view, { title, ...extra });
+const render = (view, title) => (req, res) => res.render(view, { title });
 module.exports = {
     home: render('pages/home', 'Início'),
     about: render('pages/about', 'Sobre'),

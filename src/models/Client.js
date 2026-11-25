@@ -31,7 +31,7 @@ module.exports = class Client {
                     CASE WHEN data->>'company' IS NULL OR btrim(data->>'company') = '' OR lower(btrim(data->>'company')) = name_key
                         THEN btrim(data->>'name')
                         ELSE btrim(data->>'company') || ' — ' || btrim(data->>'name')
-                    END AS display, COALESCE(data->>'cnpj', '') AS cnpj
+                    END AS display, COALESCE(data->>'cnpj', '') AS cnpj, data->>'address' AS address
                 FROM clients WHERE name_key <> '' AND jsonb_typeof(data->'name') = 'string'
             ), matches AS (
                 SELECT * FROM options WHERE $1 = '' OR CASE WHEN $2::boolean
@@ -41,33 +41,33 @@ module.exports = class Client {
                 END
                 ORDER BY name_key, id LIMIT $3
             )
-            SELECT id, cnpj, CASE WHEN count(*) OVER (PARTITION BY display) > 1
+            SELECT id, cnpj, address, CASE WHEN count(*) OVER (PARTITION BY display) > 1
                 THEN concat_ws(' · ', display, NULLIF(cnpj, ''), left(id::text, 8))
                 ELSE display END AS label
             FROM matches
             ORDER BY name_key, id
         `, [search, exact, exact ? 2 : 20]);
-        return rows;
+        return rows.map(row => ({ ...row, address: text(row.address) }));
     }
 
     static async pendingTravel(revision, limit = 25, cachedOrigin = null, run = query) {
         const { rows } = await run(`
-            SELECT data || jsonb_build_object('id', id) AS data FROM clients
+            SELECT id, btrim(data->>'address') AS address, data->'travel' AS travel FROM clients
             WHERE jsonb_typeof(data->'address') = 'string' AND data->>'address' ~ '[^[:space:]]'
                 AND jsonb_typeof(data->'name') = 'string' AND name_key <> ''
                 AND (cnpj_key IS NULL OR cnpj_key ~ '^[A-Z0-9]{12}[0-9]{2}$')
                 AND (data#>>'{travel,revision}' IS DISTINCT FROM $1
-                    OR data#>>'{travel,address}' IS DISTINCT FROM data->>'address'
+                    OR data#>>'{travel,address}' IS DISTINCT FROM btrim(data->>'address')
                     OR (data#>>'{travel,status}' = 'temporarily_unavailable'
                         AND CASE WHEN data#>>'{travel,retryAfter}' ~ '^[0-9]{1,18}$'
                             THEN (data#>>'{travel,retryAfter}')::bigint ELSE 0 END <= $3))
                 AND ($4::text IS NULL OR (data#>>'{travel,status}' = 'ready'
                     AND data#>>'{travel,originAddress}' = $4
-                    AND data#>>'{travel,address}' = data->>'address'))
+                    AND data#>>'{travel,address}' = btrim(data->>'address')))
             ORDER BY id
             LIMIT $2
         `, [revision, limit, Date.now(), cachedOrigin]);
-        return rows.map(row => row.data);
+        return rows;
     }
 
     static async saveTravel(id, address, travel, run = query) {

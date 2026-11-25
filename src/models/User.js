@@ -44,12 +44,17 @@ async function page(cursor) {
     return { ...pageFrom(rows, limit), after: sort === null ? null : cursor };
 }
 
-async function create({ name, email, password, role, mileageRateCentsPerKm = null }) {
-    const { rows } = await write(`
+async function insert({ name, email, role, mileageRateCentsPerKm = null }, passwordHash, run = write) {
+    const { rows: [user] } = await run(`
         INSERT INTO users(name, email, password_hash, role, mileage_rate_cents_per_km)
         VALUES ($1, $2, $3, $4, $5) RETURNING ${columns}
-    `, [name, email.toLowerCase(), await hashPassword(password), role, mileageRateCentsPerKm]);
-    return rows[0];
+    `, [name, email, passwordHash, role, mileageRateCentsPerKm]);
+    return user;
+}
+
+async function create(user) {
+    const email = user.email.toLowerCase();
+    return insert({ ...user, email }, await hashPassword(user.password));
 }
 
 async function savePasswordLink(client, userId) {
@@ -75,13 +80,10 @@ async function manage(actor, targetId, work) {
     });
 }
 
-async function createInvited({ name, email, role, mileageRateCentsPerKm = null }, actor) {
+async function createInvited(user, actor) {
     return manage(actor, null, async client => {
-        const { rows } = await client.query(`
-            INSERT INTO users(name, email, password_hash, role, mileage_rate_cents_per_km)
-            VALUES ($1, $2, $3, $4, $5) RETURNING id
-        `, [name, email, pending, role, mileageRateCentsPerKm]);
-        return savePasswordLink(client, rows[0].id);
+        const { id } = await insert(user, pending, client.query.bind(client));
+        return savePasswordLink(client, id);
     });
 }
 
@@ -162,6 +164,6 @@ async function remove(id, actor) {
 }
 
 module.exports = {
-    hashPassword, verifyPassword, byEmail, activeById, page, create, createInvited, issuePasswordLink,
+    verifyPassword, byEmail, activeById, page, create, createInvited, issuePasswordLink,
     passwordLinkAccount, consumePasswordLink, changePassword, update, remove
 };

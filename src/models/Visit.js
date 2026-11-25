@@ -70,6 +70,8 @@ async function find(id, runner = database) {
 }
 
 async function lock(runner, id) {
+    if (!isUuid(id))
+        return null;
     // Todas as alterações de visita e de faturamento usam o mesmo bloqueio de linha.
     const { rowCount } = await runner.query('SELECT id FROM visits WHERE id = $1 FOR UPDATE', [id]);
     return rowCount ? find(id, runner) : null;
@@ -91,7 +93,6 @@ async function prepare(runner, input, previous) {
         if (!service?.active)
             throw new ValidationError('Selecione um serviço ativo.');
     } else if (!serviceId && input.description && input.description !== previous?.description) {
-        // Compatibilidade com formulários antigos durante a atualização da aplicação.
         const { rows: [selected] } = await runner.query(
             'SELECT id, name, price_cents AS "priceCents" FROM services WHERE lower(name) = lower($1) AND active FOR SHARE',
             [input.description]
@@ -132,19 +133,19 @@ async function prepare(runner, input, previous) {
 
 async function syncResources(runner, visit, input, previous) {
     const consume = visit.status === 'concluida';
-    if (input.resources)
-        return VisitResources.sync(runner, visit.id, { ...input.resources, consume });
-    if (consume && previous && previous.status !== 'concluida') {
-        return VisitResources.sync(runner, visit.id, {
+    let resources = input.resources;
+    if (!resources && consume && previous && previous.status !== 'concluida') {
+        resources = {
             assigneeIds: previous.assignees.map(({ id }) => id),
             materials: previous.materialsUsed.map(line => ({
                 materialId: line.materialId,
                 plannedQuantity: String(line.plannedQuantity),
                 usedQuantity: String(line.usedQuantity)
-            })),
-            consume
-        });
+            }))
+        };
     }
+    if (resources)
+        await VisitResources.sync(runner, visit.id, { ...resources, consume });
 }
 
 async function create(input) {
@@ -166,13 +167,17 @@ function checkRevision(visit, revision) {
         throw new ConflictError('O lançamento financeiro desta visita precisa ser removido por um administrador antes da edição.');
 }
 
-async function update(id, input) {
+async function change(id, work) {
     if (!isUuid(id))
         return null;
     return database.withTransaction(async runner => {
-        const previous = await lock(runner, id);
-        if (!previous)
-            return null;
+        const visit = await lock(runner, id);
+        return visit ? work(runner, visit) : null;
+    });
+}
+
+function update(id, input) {
+    return change(id, async (runner, previous) => {
         checkRevision(previous, input.revision);
         const visit = { ...await prepare(runner, input, previous), id, updatedAt: new Date().toISOString(), revision: randomUUID() };
         await runner.query(`
@@ -183,13 +188,8 @@ async function update(id, input) {
     });
 }
 
-async function cancel(id, revision) {
-    if (!isUuid(id))
-        return null;
-    return database.withTransaction(async runner => {
-        const visit = await lock(runner, id);
-        if (!visit)
-            return null;
+function cancel(id, revision) {
+    return change(id, async (runner, visit) => {
         checkRevision(visit, revision);
         if (visit.status === 'concluida')
             throw new ConflictError('Uma visita concluída mantém o consumo confirmado e não pode ser cancelada.');
@@ -207,18 +207,13 @@ async function cancel(id, revision) {
     });
 }
 
-async function remove(id) {
-    if (!isUuid(id))
-        return false;
-    return database.withTransaction(async runner => {
-        const visit = await lock(runner, id);
-        if (!visit)
-            return false;
+function remove(id) {
+    return change(id, async (runner, visit) => {
         checkRevision(visit);
         if (visit.status === 'concluida' || await VisitResources.hasConsumption(id, runner))
             throw new ConflictError('O registro de uma visita concluída preserva o histórico do atendimento.');
-        const { rowCount } = await runner.query('DELETE FROM visits WHERE id = $1', [id]);
-        return rowCount > 0;
+        await runner.query('DELETE FROM visits WHERE id = $1', [id]);
+        return visit;
     });
 }
 
@@ -261,9 +256,7 @@ async function calendarPage(start, end, search, after, limit = 40) {
     ]);
     const days = {};
     for (const { day, clientName, scheduledAt } of summaryResult.rows) {
-        const summary = days[day] ??= { count: 0, preview: [] };
-        summary.count++;
-        summary.preview.push({ clientName, scheduledAt });
+        (days[day] ??= []).push({ clientName, scheduledAt });
     }
     return { ...await formatPage(pageResult.rows, limit), days };
 }
@@ -309,6 +302,6 @@ async function dashboardData(start, end) {
 }
 
 module.exports = {
-    find, create, update, cancel, delete: remove, statuses, ValidationError, ConflictError,
+    find, lock, create, update, cancel, remove, statuses, ValidationError, ConflictError,
     financePage, calendarPage, dashboardData, undatedPage, hasUndated, operationalPage
 };

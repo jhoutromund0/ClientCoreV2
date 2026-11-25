@@ -11,7 +11,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
     const moneyPattern = /^(\d{1,6})(?:[.,](\d{1,2}))?$/;
     const quantityPattern = /^(\d{1,4})(?:[.,](\d{1,3}))?$/;
-    const searches = new WeakMap();
 
     function decimal(value, pattern, scale) {
         const match = pattern.exec(value.trim());
@@ -49,47 +48,22 @@ document.addEventListener('DOMContentLoaded', () => {
         updatePreview();
     }
 
-    function cancelSearch(row) {
-        const search = searches.get(row);
-        if (search) {
-            clearTimeout(search.timer);
-            search.request.abort();
-            searches.delete(row);
-        }
-    }
-
     function searchCatalog(input) {
         const row = input.closest('[data-material-row]');
         const select = row.querySelector('[data-catalog]');
         const status = row.querySelector('[data-catalog-status]');
-        cancelSearch(row);
-        const request = new AbortController();
-        const timer = setTimeout(async () => {
-            try {
-                const query = new URLSearchParams({ busca: input.value.trim() });
-                const response = await fetch(`/financeiro/materiais?${query}`, { signal: request.signal });
-                if (!response.ok)
-                    throw new Error('Consulta ao catálogo indisponível.');
-                const { materials } = await response.json();
-                if (request.signal.aborted)
-                    return;
-                const placeholder = new Option(materials.length ? 'Selecione um material' : 'Nenhum material encontrado', '');
-                const options = materials.map(({ id, name, unit, unitValue, unitPrice }) => {
-                    const option = new Option(name, id);
-                    Object.assign(option.dataset, { name, unit, cost: unitValue.toFixed(2), price: unitPrice.toFixed(2) });
-                    return option;
-                });
-                select.replaceChildren(placeholder, ...options);
-                status.textContent = materials.length ? `${materials.length} opções no catálogo.` : 'Nenhum material encontrado.';
-            } catch {
-                if (!request.signal.aborted)
-                    status.textContent = 'Não foi possível consultar o catálogo.';
-            } finally {
-                if (searches.get(row)?.request === request)
-                    searches.delete(row);
-            }
-        }, 250);
-        searches.set(row, { request, timer });
+        optionSearch.start(input, '/financeiro/materiais', ({ materials }) => {
+            const placeholder = new Option(materials.length ? 'Selecione um material' : 'Nenhum material encontrado', '');
+            const options = materials.map(({ id, name, unit, unitValue, unitPrice }) => {
+                const option = new Option(name, id);
+                Object.assign(option.dataset, { name, unit, cost: unitValue.toFixed(2), price: unitPrice.toFixed(2) });
+                return option;
+            });
+            select.replaceChildren(placeholder, ...options);
+            status.textContent = materials.length ? `${materials.length} opções no catálogo.` : 'Nenhum material encontrado.';
+        }, () => {
+            status.textContent = 'Não foi possível consultar o catálogo.';
+        });
     }
 
     add.addEventListener('click', () => {
@@ -106,7 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!button)
             return;
         const row = button.closest('[data-material-row]');
-        cancelSearch(row);
+        optionSearch.cancel(row.querySelector('[data-catalog-search]'));
         row.remove();
         update();
         add.focus();

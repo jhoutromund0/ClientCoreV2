@@ -43,7 +43,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const clients = form.elements.clientId;
     const assignees = form.elements.assigneeId;
     const travelPayee = form.elements.travelPayeeId;
-    const lookups = new WeakMap();
     let lastAddress = clients.selectedOptions[0]?.dataset.address || '';
 
     function updateMaterialLimit() {
@@ -55,15 +54,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const options = [...assignees.selectedOptions].map(option => new Option(option.textContent.trim(), option.value));
         travelPayee.replaceChildren(travelPayee.options[0], ...options);
         travelPayee.value = options.some(option => option.value === previous) ? previous : '';
-    }
-
-    function stopLookup(input) {
-        const lookup = lookups.get(input);
-        if (lookup) {
-            clearTimeout(lookup.timer);
-            lookup.request.abort();
-            lookups.delete(input);
-        }
     }
 
     function updateOptions(select, options) {
@@ -88,29 +78,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const group = input.closest('[data-visit-lookup-group]');
         const select = group.querySelector('select');
         const status = group.querySelector('[role=status]');
-        stopLookup(input);
-        const request = new AbortController();
-        const timer = setTimeout(async () => {
-            try {
-                const params = new URLSearchParams({ busca: input.value.trim() });
-                const response = await fetch(`${input.dataset.visitLookup}?${params}`, { signal: request.signal });
-                if (!response.ok)
-                    throw new Error('Consulta indisponível.');
-                const result = await response.json();
-                const options = result.options || result.clients;
-                if (request.signal.aborted)
-                    return;
-                updateOptions(select, options);
-                status.textContent = options.length ? '' : 'Nenhum resultado para a busca.';
-            } catch {
-                if (!request.signal.aborted)
-                    status.textContent = 'Não foi possível consultar os registros. Tente novamente.';
-            } finally {
-                if (lookups.get(input)?.request === request)
-                    lookups.delete(input);
-            }
-        }, 250);
-        lookups.set(input, { timer, request });
+        optionSearch.start(input, input.dataset.visitLookup, result => {
+            const options = result.options || result.clients;
+            updateOptions(select, options);
+            status.textContent = options.length ? '' : 'Nenhum resultado para a busca.';
+        }, () => {
+            status.textContent = 'Não foi possível consultar os registros. Tente novamente.';
+        });
     }
 
     form.addEventListener('input', event => {
@@ -139,7 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!event.target.closest('[data-visit-material-remove]'))
             return;
         const row = event.target.closest('[data-visit-material-row]');
-        stopLookup(row.querySelector('[data-visit-lookup]'));
+        optionSearch.cancel(row.querySelector('[data-visit-lookup]'));
         row.remove();
         updateMaterialLimit();
         add.focus();

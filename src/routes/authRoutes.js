@@ -12,7 +12,4 @@ router.post('/conta/sessoes/:id/encerrar', a.requireAuth, wrap(c.endSession));
 router.get('/acesso/definir-senha', wrap(c.setupPage));
 router.post('/acesso/definir-senha', wrap(c.setupPassword));
 router.get('/usuarios', a.requireRole('admin'), (req, res) => res.redirect('/configuracoes/usuarios'));
-router.post('/usuarios', a.requireRole('admin'), wrap(c.createUser));
-router.post('/usuarios/:id', a.requireRole('admin'), wrap(c.updateUser));
-router.post('/usuarios/:id/excluir', a.requireRole('admin'), wrap(c.removeUser));
 module.exports = router;

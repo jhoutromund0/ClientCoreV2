@@ -58,7 +58,7 @@ async function start() {
         await pool.end();
         return;
     }
-    const server = app.listen(port, () => {
+    const server = app.listen(port, '0.0.0.0', () => {
         console.log(`Client Core disponível em http://localhost:${server.address().port}`);
         stopTravel = clientTravelService.start();
         cleanExpiredData();

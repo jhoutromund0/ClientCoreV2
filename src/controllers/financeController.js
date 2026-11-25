@@ -4,7 +4,6 @@ const Visit = require('../models/Visit');
 const TransportSettings = require('../models/TransportSettings');
 const travelService = require('../services/visitTravelService');
 const { withTransaction } = require('../config/database');
-const { isUuid } = require('../utils/pagination');
 
 const statuses = { pendente: 'Pendente', aprovado: 'Aprovado', recusado: 'Recusado' };
 const units = ['un', 'm', 'kg'];
@@ -121,13 +120,6 @@ function parseItems(rows, errors) {
     });
 }
 
-async function lockedVisit(client, id) {
-    if (!isUuid(id))
-        return null;
-    const { rowCount } = await client.query('SELECT id FROM visits WHERE id = $1 FOR UPDATE', [id]);
-    return rowCount ? Visit.find(id, client) : null;
-}
-
 exports.index = async (req, res) => {
     const [page, balance] = await Promise.all([Visit.financePage(req.query.apos), FinancialRecord.balance()]);
     const entries = page.items.map(({ visit, record }) => ({ visit, record: FinancialRecord.format(record) }));
@@ -150,7 +142,7 @@ exports.edit = async (req, res) => {
 
 exports.save = async (req, res) => {
     const result = await withTransaction(async client => {
-        const visit = await lockedVisit(client, req.params.visitId);
+        const visit = await Visit.lock(client, req.params.visitId);
         if (!visit)
             return null;
         const state = await loadState(visit, client);
@@ -202,7 +194,7 @@ exports.save = async (req, res) => {
 
 exports.remove = async (req, res) => {
     const removed = await withTransaction(async client => {
-        const visit = await lockedVisit(client, req.params.visitId);
+        const visit = await Visit.lock(client, req.params.visitId);
         return visit && FinancialRecord.delete(visit.id, client.query.bind(client));
     });
     if (!removed)
